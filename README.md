@@ -1,10 +1,10 @@
 # Aurex
 
-> Algorithmic trading system for Gold (XAUUSD) on Capital.com — EMA · RSI · Bollinger Bands · ATR
+> Algorithmic trading system for Capital.com — Gold · Stocks · Indices · Forex · Crypto — EMA · RSI · Bollinger Bands · ATR
 
 
 
-Aurex is a Python + Vue 3 trading bot that captures swing moves on daily timeframes. It can be used in three independent modes: **market analysis only**, **backtesting**, or **live trading**. No deposit required to get started — a free Capital.com demo account is enough.
+Aurex is a Python + Vue 3 trading bot that captures swing moves across any instrument available on Capital.com: commodities (Gold, Oil), stock indices (SPX500, NAS100), individual stocks (NVIDIA, Apple), forex pairs (EURUSD, GBPUSD), and crypto (BTCUSD). It works in three independent modes: **market analysis only**, **backtesting**, or **live trading**. No deposit required — a free Capital.com demo account is enough.
 
 > *"A warrior does not strike in haste. Precision is the virtue of the patient mind."*
 > — Space Marine aphorism, Chapter unknown
@@ -97,11 +97,31 @@ print(f"Signal: {'BUY' if last['buy_signal'] else 'SELL' if last['sell_signal'] 
 print(f"RSI: {last['rsi']:.1f} | ATR: {last['atr']:.2f}")
 ```
 
-**Available instruments (examples):**
+**Available instruments — `epic` reference:**
+
+| Instrument | Epic | Category |
+|------------|------|----------|
+| Gold | `GOLD` | Commodity |
+| Silver | `SILVER` | Commodity |
+| Crude Oil (WTI) | `OIL_CRUDE` | Commodity |
+| S&P 500 | `US500` | Index |
+| Nasdaq 100 | `US100` | Index |
+| Dow Jones | `US30` | Index |
+| DAX 40 | `DE40` | Index |
+| NVIDIA | `NVDA` | Stock |
+| Apple | `AAPL` | Stock |
+| Tesla | `TSLA` | Stock |
+| EUR/USD | `EURUSD` | Forex |
+| GBP/USD | `GBPUSD` | Forex |
+| Bitcoin | `BTCUSD` | Crypto |
+| Ethereum | `ETHUSD` | Crypto |
+
+> **Can't find your instrument?** Use `trading-reports/find_epic.py` to search the full Capital.com catalogue by name.
+
+**Examples:**
 ```bash
-# Search for instruments
-curl "http://localhost:8000/api/market/GOLD?timeframe=HOUR_4"
-curl "http://localhost:8000/api/market/EURUSD?timeframe=DAY"
+curl "http://localhost:8000/api/market/NVDA?timeframe=DAY"
+curl "http://localhost:8000/api/market/US500?timeframe=HOUR_4"
 curl "http://localhost:8000/api/market/BTCUSD?timeframe=HOUR"
 ```
 
@@ -113,7 +133,41 @@ curl "http://localhost:8000/api/market/BTCUSD?timeframe=HOUR"
 
 Run a walk-forward backtest against real historical data from Capital.com. Includes spread simulation, compounding, and full performance metrics.
 
-**Via API:**
+**Strategy presets** (`GET /api/presets` for full list):
+
+| Preset | Timeframe | SL | TP | Risk | Best for |
+|--------|-----------|----|----|------|----------|
+| `SWING` | DAY | 2× ATR | 2.5× ATR | 1.5% | Gold, indices — multi-day moves |
+| `SCALP` | HOUR | 1.5× ATR | 2× ATR | 1.0% | Forex, crypto — intraday |
+| `SWING_CONSERVATIVE` | DAY | 2.5× ATR | 3× ATR | 1.0% | New accounts, high-volatility instruments |
+
+---
+
+**Example: 500 EUR account · NVIDIA · SWING preset**
+```bash
+curl -X POST http://localhost:8000/api/backtest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "epic": "NVDA",
+    "timeframe": "DAY",
+    "initial_capital": 500,
+    "preset": "SWING"
+  }'
+```
+
+**Example: 500 EUR account · S&P 500 · SCALP preset**
+```bash
+curl -X POST http://localhost:8000/api/backtest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "epic": "US500",
+    "timeframe": "HOUR",
+    "initial_capital": 500,
+    "preset": "SCALP"
+  }'
+```
+
+**Manual parameter override (advanced):**
 ```bash
 curl -X POST http://localhost:8000/api/backtest \
   -H "Content-Type: application/json" \
@@ -124,13 +178,8 @@ curl -X POST http://localhost:8000/api/backtest \
     "risk_pct": 1.5,
     "spread_points": 0.5,
     "max_candles": 500,
-    "ema_fast": 8,
-    "ema_slow": 21,
-    "ema_long": 50,
-    "rsi_overbought": 65,
-    "rsi_oversold": 35,
-    "atr_sl_mult": 1.0,
-    "atr_tp_mult": 2.5
+    "ema_fast": 8, "ema_slow": 21, "ema_long": 50,
+    "atr_sl_mult": 2.0, "atr_tp_mult": 2.5
   }'
 ```
 
@@ -163,17 +212,21 @@ os.environ["CAPITAL_MODE"] = "DEMO"
 
 from capital_client import CapitalClient
 from backtester import BacktestConfig, run_backtest
-from strategy import StrategyConfig
+from strategy import StrategyConfig, STRATEGY_PRESETS
 
 client = CapitalClient()
 client.login()
-df = client.get_prices("GOLD", "DAY", 500)
+
+# Example: 500 EUR on NVIDIA with SWING preset
+df = client.get_prices("NVDA", "DAY", 500)
+preset_params = STRATEGY_PRESETS["SWING"]["params"]
 
 result = run_backtest(df, BacktestConfig(
-    epic="GOLD",
+    epic="NVDA",
     timeframe="DAY",
-    initial_capital=300.0,
+    initial_capital=500.0,
     risk_pct=1.5,
+    strategy=StrategyConfig(**preset_params),
 ))
 print(result.stats)
 ```
@@ -186,7 +239,23 @@ The bot runs in a background thread, checks signals at a configurable interval, 
 
 > **Always test in DEMO first.** Set `CAPITAL_MODE=DEMO` in `.env`.
 
-**Start the bot:**
+**Start the bot (with preset — recommended):**
+```bash
+# GOLD swing trading
+curl -X POST http://localhost:8000/api/start \
+  -H "Content-Type: application/json" \
+  -d '{"epic": "GOLD", "preset": "SWING", "risk_pct": 1.5, "max_positions": 2}'
+
+# NVIDIA scalping
+curl -X POST http://localhost:8000/api/start \
+  -H "Content-Type: application/json" \
+  -d '{"epic": "NVDA", "preset": "SCALP", "risk_pct": 1.0, "max_positions": 1}'
+```
+```json
+{ "ok": true, "message": "Bot started: GOLD @ DAY (SWING)" }
+```
+
+**Start the bot (manual parameters):**
 ```bash
 curl -X POST http://localhost:8000/api/start \
   -H "Content-Type: application/json" \
@@ -196,15 +265,9 @@ curl -X POST http://localhost:8000/api/start \
     "risk_pct": 1.5,
     "max_positions": 2,
     "check_interval": 3600,
-    "ema_fast": 8,
-    "ema_slow": 21,
-    "ema_long": 50,
-    "atr_sl_mult": 1.0,
-    "atr_tp_mult": 2.5
+    "ema_fast": 8, "ema_slow": 21, "ema_long": 50,
+    "atr_sl_mult": 2.0, "atr_tp_mult": 2.5
   }'
-```
-```json
-{ "ok": true, "message": "Bot started: GOLD @ DAY" }
 ```
 
 **Check status:**
@@ -222,9 +285,10 @@ curl -X POST http://localhost:8000/api/stop
 |-----------|---------|-------------|
 | `risk_pct` | `1.5` | % of equity risked per trade |
 | `max_positions` | `2` | Max simultaneous open positions |
-| `atr_sl_mult` | `1.0` | Stop loss = ATR × multiplier |
+| `atr_sl_mult` | `2.0` | Stop loss = ATR × multiplier (professional standard) |
 | `atr_tp_mult` | `2.5` | Take profit = ATR × multiplier (R:R = 1:2.5) |
 | `check_interval` | `3600` | Seconds between signal checks |
+| `preset` | `null` | Strategy preset name — overrides individual params |
 
 ---
 
@@ -387,6 +451,7 @@ Base URL: `http://localhost:8000`
 | `GET` | `/api/positions` | All open positions | — |
 | `GET` | `/api/trade-log` | History of bot-opened trades | — |
 | `GET` | `/api/market/{epic}` | Price + current signal | `?timeframe=DAY` |
+| `GET` | `/api/presets` | List available strategy presets | — |
 | `POST` | `/api/backtest` | Run a backtest | [BacktestRequest](#mode-2--backtesting) |
 | `POST` | `/api/start` | Start live bot | [StartRequest](#mode-3--live-trading) |
 | `POST` | `/api/stop` | Stop live bot | — |
@@ -488,8 +553,9 @@ type: algorithmic-trading-system
 language: python + javascript
 framework: fastapi + vue3
 broker: capital.com
-instrument: XAUUSD (Gold)
+instruments: any Capital.com epic (GOLD, US500, US100, NVDA, AAPL, EURUSD, BTCUSD, etc.)
 strategy: triple-ema-crossover + rsi + bollinger-bands + atr
+strategy_presets: [SWING, SCALP, SWING_CONSERVATIVE]
 
 modules:
   capital_client:
@@ -523,7 +589,7 @@ modules:
     file: bot-centralizado/backend/main.py
     framework: fastapi
     port: 8000
-    endpoints: [/api/status, /api/balance, /api/positions, /api/backtest, /api/start, /api/stop, /api/market/{epic}, /ws]
+    endpoints: [/api/status, /api/balance, /api/positions, /api/backtest, /api/start, /api/stop, /api/market/{epic}, /api/presets, /ws]
 
 config:
   env_file: bot-centralizado/backend/.env
