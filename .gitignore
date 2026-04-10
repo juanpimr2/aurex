@@ -1,0 +1,49 @@
+# ============================================================
+# AUREX — .gitignore
+# ============================================================
+
+# --- Credentials (NEVER commit these) ---
+.env
+*.env
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# --- Logs & runtime output ---
+*.log
+bot_log.txt
+backtest_results/
+logs/
+
+# --- Node / Frontend ---
+node_modules/
+frontend/dist/
+frontend/.cache/
+.npm
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Claude Code session ---
+.claude/

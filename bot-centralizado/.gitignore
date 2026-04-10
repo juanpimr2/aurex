@@ -1,0 +1,36 @@
+# === CRITICO: Credenciales ===
+.env
+*.env
+config_local.py
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Logs y resultados
+backend/logs/
+backend/backtest_results/
+*.json
+*.log
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

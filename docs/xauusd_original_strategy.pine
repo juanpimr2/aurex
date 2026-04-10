@@ -1,0 +1,66 @@
+//@version=5
+strategy("XAUUSD Strategy - Control de Drawdown", overlay=true)
+
+// --- Parámetros ---
+fastLength = input.int(6, title="Longitud EMA Rápida", minval=1, maxval=50)
+slowLength = input.int(18, title="Longitud EMA Lenta", minval=1, maxval=50)
+longLength = input.int(30, title="Longitud EMA Larga", minval=1, maxval=100)
+
+rsiLength = input.int(14, title="Longitud RSI", minval=1, maxval=50)
+rsiOverboughtLevel = input.int(70, title="Nivel de Sobrecompra RSI", minval=50, maxval=100) // Más bajo para evitar sobrecompra
+rsiOversoldLevel = input.int(30, title="Nivel de Sobreventa RSI", minval=0, maxval=50) // Más alto para evitar sobreventa
+
+atrLength = input.int(14, title="Longitud ATR", minval=1, maxval=50)
+atrMultiplierStopLoss = input.float(0.8, title="Multiplicador Stop Loss", minval=0.5, maxval=2.5) // Multiplicador más bajo
+atrMultiplierTakeProfit = input.float(2.0, title="Multiplicador Take Profit", minval=1, maxval=5)
+
+volumeMultiplier = input.int(1, title="Multiplicador de Volumen", minval=1, maxval=10)
+volatilityMultiplier = input.float(1.5, title="Multiplicador de Volatilidad", minval=1, maxval=10)
+
+// --- Cálculo de Indicadores ---
+emaFast = ta.ema(close, fastLength)
+emaSlow = ta.ema(close, slowLength)
+emaLong = ta.ema(close, longLength)
+
+rsi = ta.rsi(close, rsiLength)
+atr = ta.atr(atrLength)
+volAvg = ta.sma(volume, 50)
+basis = ta.sma(close, 20)
+dev = 2.0 * ta.stdev(close, 20)
+upperBand = basis + dev
+lowerBand = basis - dev
+
+// --- Condiciones de Entrada ---
+longTrend = emaFast > emaSlow and emaSlow > emaLong
+shortTrend = emaFast < emaSlow and emaSlow < emaLong
+
+rsiCondition = rsi > rsiOversoldLevel and rsi < rsiOverboughtLevel
+bollingerCondition = close > lowerBand and close < upperBand
+
+volatilityCondition = atr > ta.sma(atr, 50) * volatilityMultiplier
+volumeCondition = volume > volAvg * volumeMultiplier
+
+buyCondition = longTrend and rsiCondition and bollingerCondition and volumeCondition
+sellCondition = shortTrend and rsiCondition and bollingerCondition and volumeCondition
+
+// --- Cálculo de Stop Loss y Take Profit ---
+stopLoss = atr * atrMultiplierStopLoss
+takeProfit = atr * atrMultiplierTakeProfit
+
+// --- Estrategia de Control de Capital y Gestión de Riesgo ---
+riskCapital = input.float(0.015, title="Porcentaje de Riesgo por Operación", minval=0.01, maxval=0.05) // 1.5% riesgo por operación
+positionSize = strategy.equity * riskCapital / stopLoss
+
+// --- Ejecutar Órdenes ---
+if (buyCondition)
+    strategy.entry("Buy", strategy.long, qty=positionSize, stop=close - stopLoss, limit=close + takeProfit, comment="Buy Signal")
+
+if (sellCondition)
+    strategy.entry("Sell", strategy.short, qty=positionSize, stop=close + stopLoss, limit=close - takeProfit, comment="Sell Signal")
+
+// --- Visualización ---
+plot(emaFast, title="EMA Rápida", color=color.green)
+plot(emaSlow, title="EMA Lenta", color=color.red)
+plot(emaLong, title="EMA Larga", color=color.blue)
+plot(upperBand, title="Banda Superior Bollinger", color=color.orange)
+plot(lowerBand, title="Banda Inferior Bollinger", color=color.orange)
