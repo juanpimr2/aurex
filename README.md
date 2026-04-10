@@ -2,10 +2,12 @@
 
 > Algorithmic trading system for Gold (XAUUSD) on Capital.com — EMA · RSI · Bollinger Bands · ATR
 
-> *"A warrior does not strike in haste. Precision is the virtue of the patient mind."*
-> — Space Marine aphorism, Chapter unknown
+
 
 Aurex is a Python + Vue 3 trading bot that captures swing moves on daily timeframes. It can be used in three independent modes: **market analysis only**, **backtesting**, or **live trading**. No deposit required to get started — a free Capital.com demo account is enough.
+
+> *"A warrior does not strike in haste. Precision is the virtue of the patient mind."*
+> — Space Marine aphorism, Chapter unknown
 
 ---
 
