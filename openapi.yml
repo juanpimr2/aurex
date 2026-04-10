@@ -1,0 +1,636 @@
+openapi: 3.1.0
+info:
+  title: Aurex Trading API
+  description: "\nAlgorithmic trading system for Capital.com.\n\nSupports **Gold,\
+    \ Stocks (NVDA, AAPL, TSLA), Indices (US500, US100), Forex, and Crypto**\nvia\
+    \ a triple EMA crossover strategy enhanced with RSI, Bollinger Bands, and ATR-based\n\
+    risk management.\n\n## Features\n- **Market analysis** — real-time signals for\
+    \ any Capital.com instrument\n- **Backtesting** — walk-forward simulation with\
+    \ spread costs and compounding\n- **Live trading** — automated position management\
+    \ with configurable risk\n- **Strategy presets** — SWING / SCALP / SWING_CONSERVATIVE\
+    \ ready to use\n\n## Instruments\nUse the Capital.com epic code: `GOLD`, `US500`,\
+    \ `US100`, `NVDA`, `AAPL`, `EURUSD`, `BTCUSD`, etc.\n\n## Quick start\n```bash\n\
+    # Market signal\ncurl http://localhost:8000/api/market/GOLD?timeframe=DAY\n\n\
+    # Backtest 500 EUR on NVIDIA with SWING preset\ncurl -X POST http://localhost:8000/api/backtest\
+    \ \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"epic\": \"NVDA\", \"\
+    initial_capital\": 500, \"preset\": \"SWING\"}'\n\n# Start live bot\ncurl -X POST\
+    \ http://localhost:8000/api/start \\\n  -H \"Content-Type: application/json\"\
+    \ \\\n  -d '{\"epic\": \"GOLD\", \"preset\": \"SWING\", \"risk_pct\": 1.5}'\n\
+    ```\n"
+  contact:
+    name: Aurex
+    url: https://github.com/juanpimr2/aurex
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  version: 2.1.0
+paths:
+  /api/presets:
+    get:
+      tags:
+      - strategy
+      summary: List strategy presets
+      description: 'Returns all available strategy presets.
+
+
+        Each preset defines a complete trading configuration:
+
+        - **SWING** — daily timeframe, wide SL (2× ATR). Best for Gold, indices.
+
+        - **SCALP** — hourly timeframe, tighter SL (1.5× ATR). Best for forex, crypto.
+
+        - **SWING_CONSERVATIVE** — daily timeframe, wider SL (2.5× ATR), 1% risk.
+        For new accounts.
+
+
+        Use the preset name in `/api/backtest` or `/api/start` via the `preset` field.'
+      operationId: get_presets_api_presets_get
+      responses:
+        '200':
+          description: Available strategy presets with description and recommended
+            parameters.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Get Presets Api Presets Get
+  /api/status:
+    get:
+      tags:
+      - live
+      summary: Bot status
+      description: 'Returns whether the live trading bot is running, and if so, its
+        current configuration
+
+        and runtime statistics (trades executed, last signal, equity).'
+      operationId: get_status_api_status_get
+      responses:
+        '200':
+          description: Current bot state, active configuration, and runtime stats.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Get Status Api Status Get
+  /api/balance:
+    get:
+      tags:
+      - account
+      summary: Account balance
+      description: 'Fetches the current balance from Capital.com.
+
+
+        Returns the preferred account''s `balance`, `available` funds, and open `profit_loss`.
+
+        Requires valid credentials in `.env`.'
+      operationId: get_balance_api_balance_get
+      responses:
+        '200':
+          description: Current Capital.com account balance and P&L.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Get Balance Api Balance Get
+  /api/positions:
+    get:
+      tags:
+      - account
+      summary: Open positions
+      description: 'Returns all currently open positions on the Capital.com account.
+
+
+        Each position includes: `deal_id`, `epic`, `direction` (BUY/SELL), `size`,
+
+        `entry_price`, `stop_loss`, `take_profit`, `profit_loss`, `created_at`.'
+      operationId: get_positions_api_positions_get
+      responses:
+        '200':
+          description: List of currently open positions on Capital.com.
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+                title: Response Get Positions Api Positions Get
+  /api/trade-log:
+    get:
+      tags:
+      - live
+      summary: Trade history
+      description: 'Returns the trade history for the current bot session.
+
+
+        Note: this is in-memory only. History resets when the server restarts.'
+      operationId: get_trade_log_api_trade_log_get
+      responses:
+        '200':
+          description: List of trades opened by the bot in the current session.
+          content:
+            application/json:
+              schema:
+                items:
+                  type: object
+                type: array
+                title: Response Get Trade Log Api Trade Log Get
+  /api/market/{epic}:
+    get:
+      tags:
+      - market
+      summary: Market signal
+      description: 'Returns the current price and strategy signal for any Capital.com
+        instrument.
+
+
+        **Epic codes (examples):**
+
+
+        | Instrument | Epic |
+
+        |---|---|
+
+        | Gold | `GOLD` |
+
+        | S&P 500 | `US500` |
+
+        | Nasdaq 100 | `US100` |
+
+        | NVIDIA | `NVDA` |
+
+        | EUR/USD | `EURUSD` |
+
+        | Bitcoin | `BTCUSD` |
+
+
+        Signal is generated from the last **complete** candle (penultimate row) to
+        avoid look-ahead bias.
+
+
+        Signal conditions:
+
+        - **BUY**: EMA8 > EMA21 > EMA50 · RSI in (35, 65) · price inside Bollinger
+        Bands · volume above average
+
+        - **SELL**: EMA8 < EMA21 < EMA50 · same filters
+
+        - **NONE**: no clear trend or filters not met'
+      operationId: get_market_api_market__epic__get
+      parameters:
+      - name: epic
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Epic
+      - name: timeframe
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Candle resolution.
+          examples:
+          - MINUTE
+          - HOUR
+          - HOUR_4
+          - DAY
+          default: HOUR
+          title: Timeframe
+        description: Candle resolution.
+      responses:
+        '200':
+          description: Current price, strategy signal, and indicator values for the
+            requested instrument.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Get Market Api Market  Epic  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/backtest:
+    post:
+      tags:
+      - backtest
+      summary: Run backtest
+      description: 'Runs a walk-forward backtest against real Capital.com historical
+        data.
+
+
+        ## How it works
+
+        1. Downloads up to `max_candles` OHLCV candles from Capital.com
+
+        2. Simulates the strategy candle-by-candle (no look-ahead bias)
+
+        3. Applies spread costs on every entry and exit
+
+        4. Uses compounding — each P&L updates the equity for the next trade
+
+
+        ## Using presets
+
+        Send `"preset": "SWING"` (or `"SCALP"` / `"SWING_CONSERVATIVE"`) to use a
+
+        pre-configured strategy. Individual EMA/RSI/ATR params are ignored when preset
+        is set.
+
+
+        ## Returned metrics
+
+        `win_rate_pct`, `profit_factor`, `total_return_pct`, `max_drawdown_pct`,
+
+        `avg_win_money`, `avg_loss_money`, `expectancy_per_trade`, `max_win_streak`,
+
+        `max_loss_streak`, `total_spread_cost`, `verdict`'
+      operationId: run_backtest_endpoint_api_backtest_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BacktestRequest'
+        required: true
+      responses:
+        '200':
+          description: Backtest statistics, equity curve, and individual trade list.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Run Backtest Endpoint Api Backtest Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/start:
+    post:
+      tags:
+      - live
+      summary: Start live bot
+      description: 'Starts the live trading bot in a background thread.
+
+
+        The bot checks for signals every `check_interval` seconds. When a signal is
+        detected
+
+        and position limits allow it, it opens a position with ATR-based SL and TP.
+
+
+        ## Using presets
+
+        `"preset": "SWING"` automatically configures timeframe (`DAY`), EMA periods,
+
+        ATR multipliers, and check interval (3600s). Manual params are ignored.
+
+
+        ## Safety
+
+        - Always test with `CAPITAL_MODE=DEMO` in `.env` before switching to REAL.
+
+        - The bot will not open more positions than `max_positions`.
+
+        - Risk per trade is capped to `risk_pct`% of current equity (compounding).'
+      operationId: start_trading_api_start_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartRequest'
+        required: true
+      responses:
+        '200':
+          description: Confirmation message with active epic, timeframe, and preset.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Start Trading Api Start Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/stop:
+    post:
+      tags:
+      - live
+      summary: Stop live bot
+      description: 'Stops the live trading bot gracefully.
+
+
+        Open positions are **not** automatically closed — they remain on Capital.com
+
+        and can be managed manually or via `/api/positions`.'
+      operationId: stop_trading_api_stop_post
+      responses:
+        '200':
+          description: Confirmation that the bot has been stopped.
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Stop Trading Api Stop Post
+components:
+  schemas:
+    BacktestRequest:
+      properties:
+        epic:
+          type: string
+          title: Epic
+          description: Capital.com instrument epic code.
+          default: GOLD
+          examples:
+          - GOLD
+          - NVDA
+          - US500
+          - BTCUSD
+          - EURUSD
+        timeframe:
+          type: string
+          title: Timeframe
+          description: 'Candle resolution. Recommended: DAY for SWING, HOUR for SCALP.'
+          default: DAY
+          examples:
+          - MINUTE
+          - MINUTE_5
+          - MINUTE_15
+          - MINUTE_30
+          - HOUR
+          - HOUR_4
+          - DAY
+          - WEEK
+        initial_capital:
+          type: number
+          exclusiveMinimum: 0.0
+          title: Initial Capital
+          description: Starting capital in account currency (EUR, USD, etc.).
+          default: 300.0
+          examples:
+          - 300.0
+          - 500.0
+          - 1000.0
+        risk_pct:
+          type: number
+          maximum: 10.0
+          exclusiveMinimum: 0.0
+          title: Risk Pct
+          description: 'Percentage of equity risked per trade. Recommended: 1–2%.'
+          default: 1.5
+          examples:
+          - 1.0
+          - 1.5
+          - 2.0
+        spread_points:
+          type: number
+          minimum: 0.0
+          title: Spread Points
+          description: Simulated spread in price points. Typical Capital.com Gold
+            spread ≈ 0.5.
+          default: 0.5
+        max_candles:
+          type: integer
+          maximum: 1000.0
+          minimum: 100.0
+          title: Max Candles
+          description: Number of historical candles to fetch (max 1000).
+          default: 500
+        preset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Preset
+          description: Strategy preset name. If set, overrides individual EMA/RSI/ATR
+            params.
+          examples:
+          - SWING
+          - SCALP
+          - SWING_CONSERVATIVE
+        ema_fast:
+          type: integer
+          title: Ema Fast
+          description: Fast EMA period.
+          default: 8
+        ema_slow:
+          type: integer
+          title: Ema Slow
+          description: Slow EMA period.
+          default: 21
+        ema_long:
+          type: integer
+          title: Ema Long
+          description: Long EMA period.
+          default: 50
+        rsi_period:
+          type: integer
+          title: Rsi Period
+          description: RSI calculation period.
+          default: 14
+        rsi_overbought:
+          type: number
+          title: Rsi Overbought
+          description: RSI overbought threshold (no entry above).
+          default: 65.0
+        rsi_oversold:
+          type: number
+          title: Rsi Oversold
+          description: RSI oversold threshold (no entry below).
+          default: 35.0
+        atr_period:
+          type: integer
+          title: Atr Period
+          description: ATR calculation period.
+          default: 14
+        atr_sl_mult:
+          type: number
+          title: Atr Sl Mult
+          description: 'Stop loss = ATR × multiplier. Professional standard: 2.0–2.5×.'
+          default: 2.0
+          examples:
+          - 1.5
+          - 2.0
+          - 2.5
+        atr_tp_mult:
+          type: number
+          title: Atr Tp Mult
+          description: 'Take profit = ATR × multiplier. R:R ratio = atr_sl_mult :
+            atr_tp_mult.'
+          default: 2.5
+          examples:
+          - 2.0
+          - 2.5
+          - 3.0
+      type: object
+      title: BacktestRequest
+      examples:
+      - summary: 500 EUR on NVIDIA — SWING preset
+        value:
+          epic: NVDA
+          initial_capital: 500
+          preset: SWING
+          timeframe: DAY
+      - summary: 500 EUR on S&P 500 — SCALP preset
+        value:
+          epic: US500
+          initial_capital: 500
+          preset: SCALP
+          timeframe: HOUR
+      - summary: Gold — manual parameters
+        value:
+          atr_sl_mult: 2.0
+          atr_tp_mult: 2.5
+          ema_fast: 8
+          ema_long: 50
+          ema_slow: 21
+          epic: GOLD
+          initial_capital: 300
+          max_candles: 500
+          risk_pct: 1.5
+          spread_points: 0.5
+          timeframe: DAY
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    StartRequest:
+      properties:
+        epic:
+          type: string
+          title: Epic
+          description: Capital.com instrument epic code.
+          default: GOLD
+          examples:
+          - GOLD
+          - NVDA
+          - US500
+          - EURUSD
+        timeframe:
+          type: string
+          title: Timeframe
+          description: Candle resolution. Automatically set from preset if provided.
+          default: DAY
+        risk_pct:
+          type: number
+          maximum: 10.0
+          exclusiveMinimum: 0.0
+          title: Risk Pct
+          description: Percentage of equity risked per trade.
+          default: 1.5
+        max_positions:
+          type: integer
+          maximum: 10.0
+          minimum: 1.0
+          title: Max Positions
+          description: Maximum number of simultaneous open positions.
+          default: 2
+        check_interval:
+          type: integer
+          minimum: 60.0
+          title: Check Interval
+          description: Seconds between signal checks. Automatically set from preset
+            if provided.
+          default: 3600
+          examples:
+          - 1800
+          - 3600
+          - 7200
+        preset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Preset
+          description: Strategy preset. Sets timeframe, EMA, ATR params, and check_interval
+            automatically.
+          examples:
+          - SWING
+          - SCALP
+          - SWING_CONSERVATIVE
+        ema_fast:
+          type: integer
+          title: Ema Fast
+          description: Fast EMA period.
+          default: 8
+        ema_slow:
+          type: integer
+          title: Ema Slow
+          description: Slow EMA period.
+          default: 21
+        ema_long:
+          type: integer
+          title: Ema Long
+          description: Long EMA period.
+          default: 50
+        rsi_period:
+          type: integer
+          title: Rsi Period
+          description: RSI period.
+          default: 14
+        atr_sl_mult:
+          type: number
+          title: Atr Sl Mult
+          description: Stop loss ATR multiplier.
+          default: 2.0
+        atr_tp_mult:
+          type: number
+          title: Atr Tp Mult
+          description: Take profit ATR multiplier.
+          default: 2.5
+      type: object
+      title: StartRequest
+      examples:
+      - summary: Gold swing trading
+        value:
+          epic: GOLD
+          max_positions: 2
+          preset: SWING
+          risk_pct: 1.5
+      - summary: NVIDIA scalping
+        value:
+          epic: NVDA
+          max_positions: 1
+          preset: SCALP
+          risk_pct: 1.0
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+tags:
+- name: market
+  description: Real-time price data and strategy signals for any Capital.com instrument.
+- name: backtest
+  description: Walk-forward backtesting against real historical data. Supports strategy
+    presets and custom parameters.
+- name: live
+  description: Start, stop, and monitor the live trading bot.
+- name: account
+  description: Capital.com account balance and open positions.
+- name: strategy
+  description: Strategy preset definitions — SWING, SCALP, SWING_CONSERVATIVE.
