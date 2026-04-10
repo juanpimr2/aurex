@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from capital_client import CapitalClient
-from strategy import StrategyConfig
+from strategy import StrategyConfig, STRATEGY_PRESETS
 from backtester import BacktestConfig, run_backtest
 from trader import LiveTrader
 
@@ -63,7 +63,8 @@ class BacktestRequest(BaseModel):
     risk_pct: float = 1.5
     spread_points: float = 0.5
     max_candles: int = 500
-    # Parámetros de estrategia (optimizados: DAY 500v, WR 46.7%, PF 2.26, +441%)
+    preset: Optional[str] = None    # "SWING" | "SCALP" | "SWING_CONSERVATIVE" | None (manual)
+    # Parámetros de estrategia (se sobreescriben si se usa preset)
     ema_fast: int = 8
     ema_slow: int = 21
     ema_long: int = 50
@@ -71,7 +72,7 @@ class BacktestRequest(BaseModel):
     rsi_overbought: float = 65.0
     rsi_oversold: float = 35.0
     atr_period: int = 14
-    atr_sl_mult: float = 1.0
+    atr_sl_mult: float = 2.0
     atr_tp_mult: float = 2.5
 
 
@@ -81,15 +82,31 @@ class StartRequest(BaseModel):
     risk_pct: float = 1.5
     max_positions: int = 2
     check_interval: int = 3600      # DAY = revisar cada hora es suficiente
+    preset: Optional[str] = None    # "SWING" | "SCALP" | "SWING_CONSERVATIVE" | None (manual)
+    # Parámetros individuales (se ignoran si se usa preset)
     ema_fast: int = 8
     ema_slow: int = 21
     ema_long: int = 50
     rsi_period: int = 14
-    atr_sl_mult: float = 1.0
+    atr_sl_mult: float = 2.0
     atr_tp_mult: float = 2.5
 
 
 # ── Endpoints REST ─────────────────────────────────────────────────────────
+
+@app.get("/api/presets")
+def get_presets():
+    """Lista de presets de estrategia disponibles con descripción"""
+    return {
+        name: {
+            "name": p["name"],
+            "description": p["description"],
+            "recommended_timeframe": p["recommended_timeframe"],
+            "check_interval_sec": p["check_interval_sec"],
+        }
+        for name, p in STRATEGY_PRESETS.items()
+    }
+
 
 @app.get("/api/status")
 def get_status():
@@ -172,18 +189,23 @@ async def run_backtest_endpoint(req: BacktestRequest):
     if df is None or len(df) < 100:
         return {"error": f"No hay suficientes datos para {req.epic}. Prueba otro activo o timeframe."}
 
-    strategy_cfg = StrategyConfig(
-        ema_fast=req.ema_fast,
-        ema_slow=req.ema_slow,
-        ema_long=req.ema_long,
-        rsi_period=req.rsi_period,
-        rsi_overbought=req.rsi_overbought,
-        rsi_oversold=req.rsi_oversold,
-        atr_period=req.atr_period,
-        atr_sl_mult=req.atr_sl_mult,
-        atr_tp_mult=req.atr_tp_mult,
-        risk_pct=req.risk_pct,
-    )
+    if req.preset and req.preset in STRATEGY_PRESETS:
+        preset_params = STRATEGY_PRESETS[req.preset]["params"]
+        strategy_cfg = StrategyConfig(**preset_params)
+        strategy_cfg.risk_pct = req.risk_pct  # Allow override of risk from request
+    else:
+        strategy_cfg = StrategyConfig(
+            ema_fast=req.ema_fast,
+            ema_slow=req.ema_slow,
+            ema_long=req.ema_long,
+            rsi_period=req.rsi_period,
+            rsi_overbought=req.rsi_overbought,
+            rsi_oversold=req.rsi_oversold,
+            atr_period=req.atr_period,
+            atr_sl_mult=req.atr_sl_mult,
+            atr_tp_mult=req.atr_tp_mult,
+            risk_pct=req.risk_pct,
+        )
 
     bt_config = BacktestConfig(
         epic=req.epic,
@@ -215,27 +237,39 @@ def start_trading(req: StartRequest):
     if _trader and _trader.status["running"]:
         return {"error": "El bot ya está corriendo"}
 
-    cfg = StrategyConfig(
-        ema_fast=req.ema_fast,
-        ema_slow=req.ema_slow,
-        ema_long=req.ema_long,
-        rsi_period=req.rsi_period,
-        atr_sl_mult=req.atr_sl_mult,
-        atr_tp_mult=req.atr_tp_mult,
-    )
+    if req.preset and req.preset in STRATEGY_PRESETS:
+        preset = STRATEGY_PRESETS[req.preset]
+        cfg = StrategyConfig(**preset["params"])
+        cfg.risk_pct = req.risk_pct
+        timeframe = req.timeframe if req.timeframe != "DAY" else preset["recommended_timeframe"]
+        check_interval = preset["check_interval_sec"]
+        preset_label = req.preset
+    else:
+        cfg = StrategyConfig(
+            ema_fast=req.ema_fast,
+            ema_slow=req.ema_slow,
+            ema_long=req.ema_long,
+            rsi_period=req.rsi_period,
+            atr_sl_mult=req.atr_sl_mult,
+            atr_tp_mult=req.atr_tp_mult,
+        )
+        cfg.risk_pct = req.risk_pct
+        timeframe = req.timeframe
+        check_interval = req.check_interval
+        preset_label = "MANUAL"
 
     _trader = LiveTrader(
         epic=req.epic,
-        timeframe=req.timeframe,
+        timeframe=timeframe,
         risk_pct=req.risk_pct,
         max_positions=req.max_positions,
-        check_interval=req.check_interval,
+        check_interval=check_interval,
         strategy_cfg=cfg,
         on_event=_broadcast,
     )
 
     if _trader.start():
-        return {"ok": True, "message": f"Bot iniciado: {req.epic} @ {req.timeframe}"}
+        return {"ok": True, "message": f"Bot iniciado: {req.epic} @ {timeframe} ({preset_label})"}
     return {"error": "No se pudo iniciar el bot. Verifica las credenciales en .env"}
 
 
