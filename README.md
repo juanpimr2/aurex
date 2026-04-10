@@ -2,12 +2,10 @@
 
 > Algorithmic trading system for Capital.com — Gold · Stocks · Indices · Forex · Crypto — EMA · RSI · Bollinger Bands · ATR
 
-
-
-Aurex is a Python + Vue 3 trading bot that captures swing moves across any instrument available on Capital.com: commodities (Gold, Oil), stock indices (SPX500, NAS100), individual stocks (NVIDIA, Apple), forex pairs (EURUSD, GBPUSD), and crypto (BTCUSD). It works in three independent modes: **market analysis only**, **backtesting**, or **live trading**. No deposit required — a free Capital.com demo account is enough.
-
 > *"A warrior does not strike in haste. Precision is the virtue of the patient mind."*
 > — Space Marine aphorism, Chapter unknown
+
+Aurex is a Python + Vue 3 trading bot that captures swing moves across any instrument available on Capital.com: commodities (Gold, Oil), stock indices (SPX500, NAS100), individual stocks (NVIDIA, Apple), forex pairs (EURUSD, GBPUSD), and crypto (BTCUSD). It works in three independent modes: **market analysis only**, **backtesting**, or **live trading**. No deposit required — a free Capital.com demo account is enough.
 
 ---
 
