@@ -182,6 +182,24 @@ class CapitalClient:
             print(f"[CapitalClient] open_position exception: {e}")
         return None
 
+    def modify_position(self, deal_id: str, stop_loss: float = None, take_profit: float = None) -> bool:
+        """Modificar SL/TP de una posicion abierta."""
+        if not self.ensure_session():
+            return False
+        payload = {}
+        if stop_loss is not None:
+            payload["stopLevel"] = round(stop_loss, 2)
+        if take_profit is not None:
+            payload["profitLevel"] = round(take_profit, 2)
+        if not payload:
+            return False
+        try:
+            r = self.session.put(f"{self.base_url}/positions/{deal_id}", json=payload, timeout=10)
+            return r.status_code == 200
+        except Exception as e:
+            print(f"[CapitalClient] modify_position error: {e}")
+        return False
+
     def close_position(self, deal_id: str) -> bool:
         if not self.ensure_session():
             return False
