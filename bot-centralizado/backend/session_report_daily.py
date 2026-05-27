@@ -142,12 +142,26 @@ if trades_hoy:
         if t.get('notes'):
             print("     " + t['notes'])
 
-# -- Observacion M15
+# -- Trades M15 reales del dia
+m15_real = [s for s in m15_hoy if 'REAL' in str(s.get('notas', ''))]
+m15_obs  = [s for s in m15_hoy if s not in m15_real]
+
 print()
-print("OBSERVACION M15 (SIN DINERO REAL)")
-print("  Senales hoy       : " + str(len(m15_hoy)))
-print("  BUY M15           : " + str(len(m15_buys)))
-print("  SELL M15          : " + str(len(m15_sells)))
+print("TRADES M15 REALES")
+print("  Trades hoy        : " + str(len(m15_real)))
+print("  BUY               : " + str(len([s for s in m15_real if s['direction'] == 'BUY'])))
+print("  SELL              : " + str(len([s for s in m15_real if s['direction'] == 'SELL'])))
+if m15_real:
+    m15_abiertos = [s for s in m15_real if 'OPEN' in str(s.get('resultado', ''))]
+    m15_error    = [s for s in m15_real if 'ERROR' in str(s.get('resultado', ''))]
+    print("  Abiertos          : " + str(len(m15_abiertos)))
+    if m15_error:
+        print("  Errores apertura  : " + str(len(m15_error)))
+
+if m15_obs:
+    print()
+    print("OBSERVACION M15 (sin dinero)")
+    print("  Senales           : " + str(len(m15_obs)))
 if m15_vs_h1_conflict > 0:
     print("  Conflictos M15 vs H1 BUY: " + str(m15_vs_h1_conflict) + " senales SELL durante trade BUY activo")
 

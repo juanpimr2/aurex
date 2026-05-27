@@ -144,7 +144,7 @@ def apply_trailing_stop(client, positions):
                 if ok:
                     print("  [TRAILING STOP] SL -> breakeven $" + str(breakeven)
                           + " | " + direc + " " + str(p.get('epic', ''))
-                          + " | " + str(round(pct_tp, 1)) + "% TP alcanzado ✓")
+                          + " | " + str(round(pct_tp, 1)) + "% TP alcanzado OK")
                 else:
                     print("  [TRAILING STOP] ERROR al mover SL de " + direc
                           + " " + str(p.get('epic', '')) + " — verificar manualmente")
@@ -247,6 +247,20 @@ print("  EMA H1   : " + str(round(float(h1_prev['ema_fast']), 2))
       + "  [" + h1_ema_align + "]")
 print("  Tend. H4 : " + h4_trend + " | RSI H4: " + str(round(float(h4_last['rsi']), 1)))
 
+# ── Filtro ATR dinamico: H1 ATR debe superar 1.5x su SMA20 ────────────────
+ATR_VOL_MULT = 1.5
+atr_h1_val = float(h1_prev['atr'])
+try:
+    atr_h1_sma = float(df_h1['atr'].rolling(20, min_periods=10).mean().iloc[-2])
+    atr_vol_ok = atr_h1_val >= atr_h1_sma * ATR_VOL_MULT
+    atr_ref = "SMA20=" + str(round(atr_h1_sma, 2))
+except Exception:
+    atr_vol_ok = True
+    atr_ref = "SMA20=N/A"
+
+print("  ATR vol  : " + str(round(atr_h1_val, 2)) + " vs " + atr_ref
+      + " x" + str(ATR_VOL_MULT) + " -> " + ("OK" if atr_vol_ok else "BAJO"))
+
 # ── Evaluar senyal ─────────────────────────────────────────────────────────
 signal = None
 if h1_prev['buy_signal']:
@@ -257,6 +271,11 @@ elif h1_prev['sell_signal']:
 print()
 if signal is None:
     print("SENYAL: Sin senyal - esperando")
+    sys.exit(0)
+
+if not atr_vol_ok:
+    print("SENYAL: " + signal + " BLOQUEADA — ATR H1 bajo (" + str(round(atr_h1_val, 2))
+          + " < " + atr_ref + " x" + str(ATR_VOL_MULT) + ")")
     sys.exit(0)
 
 print("SENYAL: " + signal)
