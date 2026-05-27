@@ -221,6 +221,64 @@ def get_position_size(
     return max(size, min_size)
 
 
+def calculate_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> pd.DataFrame:
+    """
+    SuperTrend indicator — trend-following filter used in monitor filters.
+
+    Adds columns:
+      st_value     : SuperTrend line value
+      st_direction : 1 = bullish, -1 = bearish
+      st_buy       : True on candle where trend flips to bullish
+      st_sell      : True on candle where trend flips to bearish
+
+    Standard parameters (TradingView default): period=10, multiplier=3.0
+    """
+    df = df.copy()
+    high, low, close = df["high"], df["low"], df["close"]
+    prev_close = close.shift(1)
+    tr = pd.concat(
+        [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+    ).max(axis=1)
+    atr = tr.rolling(period).mean()
+    hl2 = (high + low) / 2
+
+    basic_upper = hl2 + multiplier * atr
+    basic_lower = hl2 - multiplier * atr
+
+    final_upper = basic_upper.copy()
+    final_lower = basic_lower.copy()
+    st = pd.Series(np.nan, index=df.index)
+    direction = pd.Series(1, index=df.index)
+
+    for i in range(1, len(df)):
+        # Final upper band
+        if close.iloc[i - 1] <= final_upper.iloc[i - 1]:
+            final_upper.iloc[i] = min(basic_upper.iloc[i], final_upper.iloc[i - 1])
+        else:
+            final_upper.iloc[i] = basic_upper.iloc[i]
+
+        # Final lower band
+        if close.iloc[i - 1] >= final_lower.iloc[i - 1]:
+            final_lower.iloc[i] = max(basic_lower.iloc[i], final_lower.iloc[i - 1])
+        else:
+            final_lower.iloc[i] = basic_lower.iloc[i]
+
+        # SuperTrend value and direction
+        prev_st = st.iloc[i - 1]
+        if pd.isna(prev_st) or prev_st == final_upper.iloc[i - 1]:
+            st.iloc[i] = final_upper.iloc[i] if close.iloc[i] <= final_upper.iloc[i] else final_lower.iloc[i]
+        else:
+            st.iloc[i] = final_lower.iloc[i] if close.iloc[i] >= final_lower.iloc[i] else final_upper.iloc[i]
+
+        direction.iloc[i] = -1 if st.iloc[i] == final_upper.iloc[i] else 1
+
+    df["st_value"]     = st
+    df["st_direction"] = direction
+    df["st_buy"]       = (direction == 1) & (direction.shift(1) == -1)
+    df["st_sell"]      = (direction == -1) & (direction.shift(1) == 1)
+    return df
+
+
 def get_latest_signal(df: pd.DataFrame, cfg: StrategyConfig) -> Optional[dict]:
     """
     Devuelve la señal más reciente o None si no hay señal.
