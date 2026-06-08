@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from capital_client import CapitalClient
 from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_position_size
 
-RISK_PCT        = 1.0    # % del equity por trade
+RISK_PCT        = 2.0    # % del equity por trade
 MAX_RISK_OPEN   = 5.0    # % maximo del equity en riesgo simultaneo
 MAX_DD_PCT      = 10.0   # % max drawdown abierto antes de pausar
 MAX_DD_DAY_PCT  = 5.0    # % max perdida diaria antes de parar
@@ -286,18 +286,26 @@ if friday_close:
     print("  -> No se abren trades hasta el lunes.")
     sys.exit(0)
 
-# ── Salvaguarda 1: conflicto H4 ────────────────────────────────────────────
+# ── Salvaguarda 1a: prioridad SWING — si hay posicion abierta, no operar ───
+gold_open = [p for p in positions if str(p.get('epic', '')).upper() == EPIC]
+if gold_open:
+    dirs = ', '.join(p.get('direction', '?') + ' x' + str(p.get('size', '?')) for p in gold_open)
+    print("  BLOQUEADA: Posicion SWING activa en " + EPIC + " (" + dirs + ")")
+    print("  -> SCALP en pausa. Un trade a la vez. Reactivacion al cierre del SWING.")
+    sys.exit(0)
+
+# ── Salvaguarda 1b: conflicto H4 ───────────────────────────────────────────
 if (signal == 'BUY' and h4_bear) or (signal == 'SELL' and h4_bull):
     print("  BLOQUEADA: H4 " + h4_trend + " contradice " + signal)
     print("  -> No se abre. Esperar alineacion H4.")
     sys.exit(0)
 
-# ── Salvaguarda 2: ya existe posicion en la misma direccion ───────────────
-gold_positions = [p for p in positions if str(p.get('epic', '')).upper() == EPIC]
-same_dir = [p for p in gold_positions if p.get('direction', '') == signal]
+# ── Salvaguarda 2: ya existe posicion en la misma direccion (otros epics) ──
+same_dir = [p for p in positions if p.get('direction', '') == signal and
+            str(p.get('epic', '')).upper() != EPIC]
 if same_dir:
-    print("  BLOQUEADA: Ya existe posicion " + signal + " en " + EPIC)
-    print("  -> No se duplica. Vigilando la actual.")
+    print("  BLOQUEADA: Ya existe posicion " + signal + " en otro instrumento")
+    print("  -> No se duplica riesgo direccional.")
     sys.exit(0)
 
 # ── Salvaguarda 3: max riesgo abierto (5% equity) ─────────────────────────

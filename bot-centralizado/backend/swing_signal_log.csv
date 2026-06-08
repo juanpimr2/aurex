@@ -1,0 +1,4 @@
+datetime_utc,epic,direction,entry_price,sl,tp,rr,size_teorico,riesgo_teorico_usd,rsi_day,atr_day,ema_align_day,h4_trend,rsi_h4,resultado,pnl_teorico_usd,notas
+2026-06-02 06:44,GOLD,SELL,4533.51,4701.34,4323.72,1.25,0.021,3.52,45.0,83.91,BAJISTA,MIXTA/LATERAL,57.0,PENDIENTE,,Trade SWING real abierto
+2026-06-04 04:34,GOLD,SELL,4474.55,4644.65,4261.93,1.25,0.1038,17.66,38.5,85.05,BAJISTA,BAJISTA,47.7,PENDIENTE,,Trade SWING real abierto
+2026-06-04 06:32,GOLD,SELL,4471.82,4641.92,4259.2,1.25,0.1041,17.7,38.5,85.05,BAJISTA,BAJISTA,47.1,PENDIENTE,,Trade SWING real abierto

@@ -25,7 +25,7 @@ from capital_client import CapitalClient
 from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_position_size
 
 EPIC     = 'GOLD'
-RISK_PCT = 1.0
+RISK_PCT = 5.0
 LOG_PATH = os.path.join(os.path.dirname(__file__), 'swing_signal_log.csv')
 MODO_REAL = True    # Activado 17 Apr 2026 — backtest 500 velas (WR 46.7%, PF 2.26, +441%)
 
@@ -178,6 +178,16 @@ if friday_close:
 if (signal == 'BUY' and h4_bear) or (signal == 'SELL' and h4_bull):
     print("  FILTRO H4: " + h4_trend + " contradice " + signal)
     print("  -> Senal DAY detectada pero H4 no confirma. Esperando alineacion.")
+    print()
+    print("  El SCALP H1 puede operar con normalidad.")
+    print("=" * 60)
+    sys.exit(0)
+
+# ── Salvaguarda: solo 1 posicion SWING simultanea ─────────────────────────
+swing_open = [p for p in positions if p.get('epic','').upper() == EPIC and p.get('direction','') == signal]
+if swing_open:
+    print("  SALVAGUARDA: Ya hay " + str(len(swing_open)) + " posicion(es) SWING " + signal + " abierta(s).")
+    print("  -> Piramidacion desactivada. Un trade SWING a la vez.")
     print()
     print("  El SCALP H1 puede operar con normalidad.")
     print("=" * 60)

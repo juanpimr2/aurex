@@ -26,6 +26,9 @@ bot_log.txt
 backtest_results/
 logs/
 
+# --- Base de datos SQLite (binario) ---
+*.db
+
 # --- Node / Frontend ---
 node_modules/
 frontend/dist/

@@ -41,7 +41,7 @@ M15_PARAMS = {
     "recommended_timeframe": "MINUTE_15",
 }
 EPIC          = 'GOLD'
-RISK_PCT      = 1.0
+RISK_PCT      = 2.0
 LOG_PATH      = os.path.join(os.path.dirname(__file__), 'm15_signal_log.csv')
 STATE_PATH    = os.path.join(os.path.dirname(__file__), 'm15_trade_state.json')
 COOLOFF_HOURS = 1.5

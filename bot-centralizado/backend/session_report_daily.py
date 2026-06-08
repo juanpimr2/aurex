@@ -15,6 +15,7 @@ from datetime import datetime, timezone, date
 
 TRADE_LOG  = os.path.join(os.path.dirname(__file__), 'trade_log.csv')
 M15_LOG    = os.path.join(os.path.dirname(__file__), 'm15_signal_log.csv')
+SWING_LOG  = os.path.join(os.path.dirname(__file__), 'swing_signal_log.csv')
 REPORT_DIR = os.path.join(os.path.dirname(__file__), 'daily_reports')
 os.makedirs(REPORT_DIR, exist_ok=True)
 
@@ -62,6 +63,22 @@ with open(M15_LOG, newline='', encoding='utf-8') as f:
     for row in reader:
         if row['datetime_utc'].startswith(today):
             m15_hoy.append(row)
+
+# ── Leer senales SWING del dia ─────────────────────────────────────
+swing_hoy = []
+if os.path.exists(SWING_LOG):
+    with open(SWING_LOG, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row['datetime_utc'].startswith(today):
+                swing_hoy.append(row)
+
+# Acumular: todos los SWING historicos para estadisticas globales
+swing_all = []
+if os.path.exists(SWING_LOG):
+    with open(SWING_LOG, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        swing_all = list(reader)
 
 # ── Calcular metricas de trades reales ────────────────────────────
 pnl_total   = 0.0
@@ -165,6 +182,49 @@ if m15_obs:
 if m15_vs_h1_conflict > 0:
     print("  Conflictos M15 vs H1 BUY: " + str(m15_vs_h1_conflict) + " senales SELL durante trade BUY activo")
 
+# -- Trades SWING del dia
+swing_real = [s for s in swing_hoy if 'real' in str(s.get('notas', '')).lower()]
+swing_obs  = [s for s in swing_hoy if s not in swing_real]
+swing_open_hoy    = [s for s in swing_real if 'PENDIENTE' in str(s.get('resultado', ''))]
+swing_cerrado_hoy = [s for s in swing_real if s not in swing_open_hoy]
+
+print()
+print("TRADES SWING DAY")
+print("  Trades hoy        : " + str(len(swing_real)))
+print("  BUY               : " + str(len([s for s in swing_real if s['direction'] == 'BUY'])))
+print("  SELL              : " + str(len([s for s in swing_real if s['direction'] == 'SELL'])))
+if swing_real:
+    print("  Abiertos (PEND.)  : " + str(len(swing_open_hoy)))
+    print("  Cerrados hoy      : " + str(len(swing_cerrado_hoy)))
+    pnl_swing_hoy = sum(float(s.get('pnl_teorico_usd') or 0) for s in swing_cerrado_hoy)
+    if swing_cerrado_hoy:
+        print("  P&L SWING cerrados: $" + str(round(pnl_swing_hoy, 2)))
+    for i, s in enumerate(swing_real, 1):
+        rr_str = "RR 1:" + str(s.get('rr','?'))
+        pnl_str = ("$" + str(s.get('pnl_teorico_usd','?'))) if s.get('pnl_teorico_usd') else "abierto"
+        print("  " + str(i) + ". " + s['direction']
+              + " entry=" + str(s.get('entry_price','?'))
+              + " | " + rr_str
+              + " | resultado=" + str(s.get('resultado','?'))
+              + " | P&L=" + pnl_str)
+if swing_obs:
+    print("  Observacion SWING : " + str(len(swing_obs)) + " senales (sin dinero real)")
+
+# -- Estadisticas SWING acumuladas
+if swing_all:
+    swing_all_real   = [s for s in swing_all if 'real' in str(s.get('notas', '')).lower()]
+    swing_all_cerr   = [s for s in swing_all_real if 'PENDIENTE' not in str(s.get('resultado', ''))]
+    swing_all_tp     = [s for s in swing_all_cerr if 'TP' in str(s.get('resultado', '')).upper()]
+    swing_all_sl     = [s for s in swing_all_cerr if 'SL' in str(s.get('resultado', '')).upper()]
+    swing_pnl_acum   = sum(float(s.get('pnl_teorico_usd') or 0) for s in swing_all_cerr)
+    swing_wr = round(len(swing_all_tp) / len(swing_all_cerr) * 100, 1) if swing_all_cerr else 0
+    print()
+    print("SWING ACUMULADO")
+    print("  Trades totales    : " + str(len(swing_all_real)) + " (" + str(len(swing_all_cerr)) + " cerrados)")
+    print("  TP / SL           : " + str(len(swing_all_tp)) + " / " + str(len(swing_all_sl)))
+    print("  Win Rate SWING    : " + str(swing_wr) + "%")
+    print("  P&L SWING acum.   : $" + str(round(swing_pnl_acum, 2)))
+
 # -- Analisis de fallos
 print()
 print("ANALISIS DE FALLOS / PATRONES DETECTADOS")
@@ -253,6 +313,8 @@ with open(report_path, 'w', encoding='utf-8') as rf:
     rf.write("M15_SENALES=" + str(len(m15_hoy)) + "\n")
     rf.write("M15_BUY=" + str(len(m15_buys)) + "\n")
     rf.write("M15_SELL=" + str(len(m15_sells)) + "\n")
+    rf.write("SWING_TRADES_HOY=" + str(len(swing_real)) + "\n")
+    rf.write("SWING_ABIERTOS=" + str(len(swing_open_hoy)) + "\n")
     rf.write("\nFALLOS:\n")
     for f in fallos:
         rf.write("  - " + f + "\n")
