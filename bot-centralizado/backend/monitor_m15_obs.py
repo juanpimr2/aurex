@@ -68,6 +68,99 @@ if not os.path.exists(LOG_PATH):
             'resultado', 'pnl_teorico_usd', 'notas'
         ])
 
+# ── Auto-cierre M15: detectar posiciones OPEN que cerraron en broker ──────
+def auto_close_m15_trades(positions, equity_now, now_str):
+    if not os.path.exists(LOG_PATH):
+        return
+
+    with open(LOG_PATH, newline='') as f:
+        rows = list(csv.DictReader(f))
+
+    open_idxs = [i for i, r in enumerate(rows)
+                 if str(r.get('resultado', '')).upper().startswith('OPEN')]
+    if not open_idxs:
+        return
+
+    active = set()
+    for p in positions:
+        active.add((str(p.get('epic', '')).upper(), p.get('direction', '')))
+
+    state_eq, state_dir = None, None
+    if os.path.exists(STATE_PATH):
+        try:
+            with open(STATE_PATH, 'r') as _sf:
+                _st = json.load(_sf)
+            state_eq  = float(_st.get('equity_before') or 0) or None
+            state_dir = _st.get('direction')
+        except Exception:
+            pass
+
+    changed = False
+    for idx in open_idxs:
+        row = rows[idx]
+        key = (str(row.get('epic', '')).upper(), row.get('direction', ''))
+        if key in active:
+            continue
+
+        notas = row.get('notas', '') or ''
+        eq_open = None
+        for part in notas.split('|'):
+            part = part.strip()
+            if part.startswith('eq_open='):
+                try:
+                    eq_open = float(part.split('=')[1])
+                except Exception:
+                    pass
+        if eq_open is None and state_eq and state_dir == row.get('direction'):
+            eq_open = state_eq
+
+        try:
+            sl_price  = float(row.get('sl')           or 0)
+            tp_price  = float(row.get('tp')           or 0)
+            entry     = float(row.get('entry_price')  or 0)
+            size      = float(row.get('size_teorico') or 0)
+            direction = row.get('direction', '')
+
+            if direction == 'BUY':
+                expected_tp_pnl = round((tp_price - entry) * size, 2)
+                expected_sl_pnl = round((entry - sl_price) * size, 2)
+            else:
+                expected_tp_pnl = round((entry - tp_price) * size, 2)
+                expected_sl_pnl = round((sl_price - entry) * size, 2)
+
+            if eq_open is not None:
+                pnl = round(equity_now - eq_open, 2)
+                if pnl >= 0:
+                    result = 'TP'
+                    if expected_tp_pnl > 0 and abs(pnl - expected_tp_pnl) < expected_tp_pnl * 0.4:
+                        pnl = expected_tp_pnl
+                else:
+                    result = 'SL'
+                    if expected_sl_pnl > 0 and abs(pnl + expected_sl_pnl) < expected_sl_pnl * 0.4:
+                        pnl = -expected_sl_pnl
+            else:
+                result = 'CERRADO'
+                pnl    = 0.0
+        except Exception:
+            result = 'CERRADO'
+            pnl    = 0.0
+
+        rows[idx]['resultado']       = result
+        rows[idx]['pnl_teorico_usd'] = pnl
+        rows[idx]['notas']           = notas + ' | AUTO-CERRADO ' + result + ' ' + now_str
+        changed = True
+        print("  [AUTO-CIERRE M15] " + row.get('direction', '') + " " + row.get('epic', '')
+              + " -> " + result + " | P&L: $" + str(pnl))
+
+    if changed:
+        fieldnames = list(rows[0].keys())
+        with open(LOG_PATH, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        print("  M15 log actualizado automaticamente.")
+
+
 # ── Connect ───────────────────────────────────────────────────────────────
 now_utc = datetime.now(timezone.utc)
 hora_utc = now_utc.hour + now_utc.minute / 60.0
@@ -79,6 +172,10 @@ if not client.login():
 
 bal    = client.get_balance()
 equity = bal['balance'] if bal else 250.0
+
+# ── Auto-cierre antes de evaluar señal ────────────────────────────────────
+open_pos_check = client.get_positions()
+auto_close_m15_trades(open_pos_check, equity, now_utc.strftime('%Y-%m-%d %H:%M'))
 
 df = client.get_prices(EPIC, 'MINUTE_15', 200)
 if df is None or len(df) < 50:
@@ -356,7 +453,7 @@ with open(LOG_PATH, 'a', newline='') as f:
         round(float(prev['rsi']), 1),
         round(float(prev['atr']), 2),
         ema_align,
-        estado, '', 'M15 REAL'
+        estado, '', 'M15 REAL | eq_open=' + str(round(equity, 2))
     ])
 
 log_trade_open(

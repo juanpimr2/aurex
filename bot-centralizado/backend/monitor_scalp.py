@@ -34,6 +34,8 @@ MAX_DD_DAY_PCT  = 5.0    # % max perdida diaria antes de parar
 EPIC            = 'GOLD'
 LOG_PATH        = os.path.join(os.path.dirname(__file__), 'trade_log.csv')
 SWING_LOG_PATH  = os.path.join(os.path.dirname(__file__), 'swing_signal_log.csv')
+M15_LOG_PATH    = os.path.join(os.path.dirname(__file__), 'm15_signal_log.csv')
+M15_STATE_PATH  = os.path.join(os.path.dirname(__file__), 'm15_trade_state.json')
 
 
 # ── Auto-cierre: detectar trades OPEN que cerraron en broker ───────────────
@@ -194,6 +196,110 @@ def auto_close_swing_trades(positions, equity_now, now_str):
         print("  Swing log actualizado automaticamente.")
 
 
+# ── Auto-cierre M15: detectar posiciones OPEN que cerraron en broker ──────
+def auto_close_m15_trades(positions, equity_now, now_str):
+    """
+    Compara entradas 'OPEN | Deal:xxx' del M15 log con posiciones activas.
+    Si una entrada OPEN ya no esta en el broker -> cerro. Actualiza log.
+    Usa eq_open de notas o equity_before del state file para calcular P&L.
+    """
+    import json as _json
+    if not os.path.exists(M15_LOG_PATH):
+        return
+
+    with open(M15_LOG_PATH, newline='', encoding='utf-8') as f:
+        rows = list(csv.DictReader(f))
+
+    open_idxs = [i for i, r in enumerate(rows)
+                 if str(r.get('resultado', '')).upper().startswith('OPEN')]
+    if not open_idxs:
+        return
+
+    active = set()
+    for p in positions:
+        active.add((str(p.get('epic', '')).upper(), p.get('direction', '')))
+
+    # Intentar leer equity_before del state file como fallback
+    state_eq = None
+    state_dir = None
+    if os.path.exists(M15_STATE_PATH):
+        try:
+            with open(M15_STATE_PATH, 'r') as _sf:
+                _st = _json.load(_sf)
+            state_eq  = float(_st.get('equity_before') or 0) or None
+            state_dir = _st.get('direction')
+        except Exception:
+            pass
+
+    changed = False
+    for idx in open_idxs:
+        row = rows[idx]
+        key = (str(row.get('epic', '')).upper(), row.get('direction', ''))
+        if key in active:
+            continue  # Sigue abierto en broker
+
+        # Intentar eq_open desde notas
+        notas = row.get('notas', '') or ''
+        eq_open = None
+        for part in notas.split('|'):
+            part = part.strip()
+            if part.startswith('eq_open='):
+                try:
+                    eq_open = float(part.split('=')[1])
+                except Exception:
+                    pass
+
+        # Fallback: state file si coincide la direccion
+        if eq_open is None and state_eq and state_dir == row.get('direction'):
+            eq_open = state_eq
+
+        try:
+            sl_price  = float(row.get('sl')            or 0)
+            tp_price  = float(row.get('tp')            or 0)
+            entry     = float(row.get('entry_price')   or 0)
+            size      = float(row.get('size_teorico')  or 0)
+            direction = row.get('direction', '')
+
+            if direction == 'BUY':
+                expected_tp_pnl = round((tp_price - entry) * size, 2)
+                expected_sl_pnl = round((entry - sl_price) * size, 2)
+            else:
+                expected_tp_pnl = round((entry - tp_price) * size, 2)
+                expected_sl_pnl = round((sl_price - entry) * size, 2)
+
+            if eq_open is not None:
+                pnl = round(equity_now - eq_open, 2)
+                if pnl >= 0:
+                    result = 'TP'
+                    if expected_tp_pnl > 0 and abs(pnl - expected_tp_pnl) < expected_tp_pnl * 0.4:
+                        pnl = expected_tp_pnl
+                else:
+                    result = 'SL'
+                    if expected_sl_pnl > 0 and abs(pnl + expected_sl_pnl) < expected_sl_pnl * 0.4:
+                        pnl = -expected_sl_pnl
+            else:
+                result = 'CERRADO'
+                pnl    = 0.0
+        except Exception:
+            result = 'CERRADO'
+            pnl    = 0.0
+
+        rows[idx]['resultado']       = result
+        rows[idx]['pnl_teorico_usd'] = pnl
+        rows[idx]['notas']           = notas + ' | AUTO-CERRADO ' + result + ' ' + now_str
+        changed = True
+        print("  [AUTO-CIERRE M15] " + row.get('direction', '') + " " + row.get('epic', '')
+              + " -> " + result + " | P&L: $" + str(pnl))
+
+    if changed:
+        fieldnames = list(rows[0].keys())
+        with open(M15_LOG_PATH, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        print("  M15 log actualizado automaticamente.")
+
+
 # ── Trailing stop: mover SL a breakeven al 50%+ del TP ────────────────────
 def apply_trailing_stop(client, positions):
     """
@@ -257,6 +363,7 @@ pnl_open  = bal['profit_loss'] if bal else 0.0
 # ── Auto-cierre antes de mostrar estado ────────────────────────────────────
 auto_close_open_trades(positions, equity, now_utc.strftime('%Y-%m-%d %H:%M'))
 auto_close_swing_trades(positions, equity, now_utc.strftime('%Y-%m-%d %H:%M'))
+auto_close_m15_trades(positions, equity, now_utc.strftime('%Y-%m-%d %H:%M'))
 
 session_label = "CIERRE SEMANA" if friday_close else "ACTIVA"
 print("=" * 55)
