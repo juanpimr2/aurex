@@ -440,8 +440,8 @@ print("  EMA H1   : " + str(round(float(h1_prev['ema_fast']), 2))
       + "  [" + h1_ema_align + "]")
 print("  Tend. H4 : " + h4_trend + " | RSI H4: " + str(round(float(h4_last['rsi']), 1)))
 
-# ── Filtro ATR dinamico: H1 ATR debe superar 1.5x su SMA20 ────────────────
-ATR_VOL_MULT = 1.5
+# ── Filtro ATR dinamico: H1 ATR debe superar 1.2x su SMA20 ────────────────
+ATR_VOL_MULT = 1.2
 atr_h1_val = float(h1_prev['atr'])
 try:
     atr_h1_sma = float(df_h1['atr'].rolling(20, min_periods=10).mean().iloc[-2])

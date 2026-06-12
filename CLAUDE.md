@@ -9,11 +9,10 @@ Directorio backend: `C:\Users\sagas\OneDrive\Escritorio\Documentos\BotMillonario
 
 ## Estado de la cuenta
 - **Capital inicial:** $250.00
-- **Balance actual:** $246.28 (actualizado 16 Apr 2026)
-- **Trades realizados:** 6 (ver trade_log.csv en el backend)
-- **P&L neto:** -$3.72 (-1.49%)
-- **Historial:** SELL -$2.22 | BUY -$2.35 | BUY -$1.64 | BUY +$6.60 (TP) | BUY -$2.64 | BUY -$2.87
-- **Objetivo mensual:** 10-15% (~$25-37/mes). 20% posible en meses con tendencia fuerte.
+- **Balance actual:** $368.13 (actualizado 12 Jun 2026)
+- **P&L neto total:** +$118.13 (+47.2% desde inicio)
+- **Semana 9-12 Jun:** SWING ~+$34 (3 trades TP) | M15 -$15.08 (2 SL) | SCALP 0 trades
+- **Objetivo mensual:** 10-15% (~$37-55/mes con balance actual). 20% posible en meses con tendencia fuerte.
 
 ---
 
@@ -21,9 +20,9 @@ Directorio backend: `C:\Users\sagas\OneDrive\Escritorio\Documentos\BotMillonario
 
 | Nivel | Monitor | TF | Dinero real | Objetivo |
 |-------|---------|-----|-------------|----------|
-| 1 — SWING | monitor_swing.py | DAY + H4 | Observacion (→ real en ~2 semanas) | Captura tendencias $30-150 |
+| 1 — SWING | monitor_swing.py | DAY + H4 | ✅ Real (activo desde Jun 2026) | Captura tendencias $30-150 |
 | 2 — SCALP | monitor_scalp.py | H1 + H4 | ✅ Real | Ganancias diarias $3-8 |
-| 3 — M15 OBS | monitor_m15_obs.py | M15 | Paper trading | Validacion 3-4 semanas |
+| 3 — M15 | monitor_m15_obs.py | M15 | ✅ Real (activo desde Jun 2026) | Intraday $5-15 |
 
 **Regla de coordinacion:** SWING tiene prioridad. Cuando SWING active modo real, SCALP queda bloqueado mientras haya posicion SWING abierta. Un trade a la vez.
 
@@ -44,6 +43,7 @@ Directorio backend: `C:\Users\sagas\OneDrive\Escritorio\Documentos\BotMillonario
 | Risk por trade | **1%** del equity | ~$2.50 con $250 |
 | Bollinger | 20 periodos, 2 desv. | Filtro de precio dentro de banda |
 | Volumen | > 1.2 × SMA(20) | Confirma actividad real |
+| ATR_VOL_MULT | **1.2** (bajado de 1.5 el 11 Jun 2026) | Filtro volatilidad menos restrictivo |
 
 **Backtest (13 meses H1 GOLD):** 42.9% Win Rate | PF 1.72 | ~12.7%/mes | MaxDD 7%
 

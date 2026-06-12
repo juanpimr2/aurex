@@ -334,6 +334,23 @@ if atr_blocked:
     print("=" * 55)
     sys.exit(0)
 
+# ── Filter: anti-spike guard (no entrar tras evento de noticias) ──────────
+# Si alguna de las ultimas 3 velas tuvo ATR > 2.5x SMA50, el mercado
+# acaba de tener un evento macro. Esperar normalizacion antes de entrar.
+SPIKE_ATR_MULT = 2.5
+try:
+    recent_atrs = df['atr'].iloc[-4:-1].values  # las 3 velas anteriores
+    spike_detected = any(a > atr_sma50 * SPIKE_ATR_MULT for a in recent_atrs if not __import__('math').isnan(a))
+    if spike_detected:
+        spike_max = round(max(a for a in recent_atrs if not __import__('math').isnan(a)), 2)
+        print()
+        print("SENYAL M15: " + signal + " BLOQUEADA — guard anti-spike activo"
+              + " (ATR pico=" + str(spike_max) + " > " + str(round(atr_sma50 * SPIKE_ATR_MULT, 2)) + ")")
+        print("=" * 55)
+        sys.exit(0)
+except Exception:
+    pass
+
 # ── Filter: H4 SuperTrend (primary directional filter) ───────────────────
 # SuperTrend on H4 has WR 86.7% / PF 8.67 on 230 days of GOLD data.
 # This is the strongest filter in the system — only trade WITH the H4 ST bias.
