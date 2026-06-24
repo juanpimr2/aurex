@@ -185,23 +185,21 @@ curl -X POST http://localhost:8000/api/backtest \
 ```json
 {
   "stats": {
-    "total_trades": 29,
-    "win_rate_pct": 46.7,
-    "profit_factor": 2.26,
-    "total_return_pct": 441.0,
-    "final_equity": 1623.00,
-    "max_drawdown_pct": 26.9,
-    "avg_win_money": 186.23,
-    "avg_loss_money": -70.65,
-    "expectancy_per_trade": 35.65,
-    "verdict": "RENTABLE - Puede usarse en live"
+    "total_trades": 24,
+    "win_rate_pct": 62.5,
+    "profit_factor": 2.02,
+    "total_return_pct": 15.3,
+    "max_drawdown_pct": 3.0,
+    "verdict": "RENTABLE - perfil conservador, captura tendencias"
   },
   "date_range": {
-    "start": "2024-09-02",
-    "end": "2026-04-09"
+    "start": "2024-11-01",
+    "end": "2026-06-22"
   }
 }
 ```
+
+> ⚠️ **Honesty note on backtests.** These are the *reproducible* walk-forward numbers for the **SWING DAY** preset (Nov 2024–Jun 2026, real spread). Earlier eye-catching figures (e.g. *+441% / PF 2.26*) were **not reproducible** with current data and have been removed. The **SCALP H1** preset is **not validated**: the Capital.com API only returns ~1 month of H1 and ~4 months of H4, far too little history. Treat SCALP as experimental until enough live history accumulates in `trade_log.csv`. Realistic combined target: **2–5%/month** when a trend is present — not the double-digit monthly returns quoted in old notes.
 
 **Via Python directly (no server needed):**
 ```python
@@ -287,6 +285,28 @@ curl -X POST http://localhost:8000/api/stop
 | `atr_tp_mult` | `2.5` | Take profit = ATR × multiplier (R:R = 1:2.5) |
 | `check_interval` | `3600` | Seconds between signal checks |
 | `preset` | `null` | Strategy preset name — overrides individual params |
+
+---
+
+### Three-Tier Autonomous System (production setup)
+
+In production, Aurex (GOLD) runs as three independent, scheduled monitors instead of the single `/api/start` loop. Each monitor logs in, evaluates its timeframe, and acts (or stays out) on its own — fully autonomous, no human in the loop.
+
+| Tier | Monitor | Timeframes | Goal |
+|------|---------|-----------|------|
+| 1 — **SWING** | `monitor_swing.py` | DAY + H4 | Capture multi-day trends ($30–150) |
+| 2 — **SCALP** | `monitor_scalp.py` | H1 + H4 | Small daily moves ($3–8) |
+| 3 — **M15** | `monitor_m15_obs.py` | M15 + H4 | Intraday ($5–15) |
+
+**Coordination — one trade at a time.** SWING has priority: while a SWING position is open, SCALP and M15 are *subordinated* and will not pyramid a second position. This is enforced inside each monitor.
+
+**Shared safeguards (coded into every monitor):**
+- SL **and** TP always set on the broker — never an unprotected position.
+- H4 trend / SuperTrend conflict → no entry against the higher timeframe.
+- Dynamic ATR volatility filter, weekend-close guard (Fri ≥ 17:00 Madrid), anti-spike guard, daily loss stop, post-SL cooling-off.
+- Trailing stop to breakeven at ~50% toward TP (preserves the existing TP — see `capital_client.modify_position`).
+
+These are typically driven by cron-style schedulers (e.g. M15 every 15 min, SCALP every 30 min, SWING at the London open) plus a daily session report.
 
 ---
 
@@ -434,6 +454,33 @@ trader = LiveTrader(
 trader.start()
 # ... runs in background thread
 trader.stop()
+```
+
+---
+
+### `smc_filters.py` — Smart Money Concepts
+
+Structure-based context layer: Fair Value Gaps (FVG), Order Blocks (OB), and Break of Structure / Change of Character (BoS / CHoCH) derived from swing highs and lows. Used by `monitor_swing.py` to confirm or temper a signal — e.g. a bearish bias with overhead bearish FVGs acting as resistance.
+
+```python
+from smc_filters import smc_zones, smc_summary
+
+zones = smc_zones(df, price)   # -> {bias, event, obs[], fvgs[]} with `inside` flags
+print(smc_summary(df))         # human-readable structure summary
+```
+
+---
+
+### `macro_context.py` — Macro / news context (never a trigger)
+
+Two-layer awareness of high-impact events. **Golden rule: news and macro events are context only — they NEVER open or close a trade.** They raise the bar for technical caution around the event.
+
+- **Layer 1 — deterministic calendar (no network):** official FOMC 2026 dates + NFP (first Friday of month). `macro_context(now)` returns a caution level (`ALTA` / `MEDIA` / `BAJA`) by proximity, surfaced in `monitor_swing.py`.
+- **Layer 2 — live review (agent + web search):** during the daily report / weekly briefing, only **official sources** are checked (`federalreserve.gov`, `treasury.gov`, `bls.gov`, `whitehouse.gov`). See `MACRO_WATCHLIST`.
+
+```python
+from macro_context import macro_context
+ctx = macro_context()          # {caution, message, next, upcoming}
 ```
 
 ---

@@ -165,6 +165,10 @@ def auto_close_m15_trades(positions, equity_now, now_str):
 now_utc = datetime.now(timezone.utc)
 hora_utc = now_utc.hour + now_utc.minute / 60.0
 
+# Cierre de semana: viernes despues de las 17:00 hora local (Madrid) -> no abrir
+now_local   = datetime.now()
+friday_close = (now_local.weekday() == 4 and now_local.hour >= 17)
+
 client = CapitalClient()
 if not client.login():
     print("ERROR: Login fallido")
@@ -232,7 +236,8 @@ ema_align = "ALCISTA" if ema_bull else ("BAJISTA" if ema_bear else "MIXTA")
 
 # ── Print market state ────────────────────────────────────────────────────
 print("=" * 55)
-print("AUREX | MONITOR M15 | " + EPIC + " | REAL")
+print("AUREX | MONITOR M15 | " + EPIC + " | REAL"
+      + ("  [CIERRE SEMANA]" if friday_close else ""))
 print("Hora UTC: " + now_utc.strftime('%H:%M') + " | Equity: $" + str(round(equity, 2)))
 print("=" * 55)
 print("MERCADO M15")
@@ -279,8 +284,14 @@ if gold_pos:
             (direc_p == 'SELL' and sl_p <= breakeven and sl_p > 0)
         )
         if not already_safe:
-            ok = client.modify_position(deal_p, stop_loss=breakeven)
+            # IMPORTANTE: pasar tambien el TP existente. El PUT de Capital.com
+            # reemplaza el estado completo — omitir profitLevel BORRA el TP.
+            ok = client.modify_position(
+                deal_p, stop_loss=breakeven,
+                take_profit=(tp_p if tp_p else None)
+            )
             print("  [TRAILING] SL -> breakeven " + str(breakeven)
+                  + " (TP preservado: " + str(tp_p) + ")"
                   + " | " + ("OK" if ok else "ERROR"))
         else:
             print("  [TRAILING] Ya en breakeven o mejor")
@@ -300,6 +311,14 @@ elif prev['sell_signal']:
 if signal is None:
     print()
     print("SENYAL M15: Sin senal - esperando")
+    print("=" * 55)
+    sys.exit(0)
+
+# ── Filter: cierre de semana (viernes >= 17:00 Madrid) ────────────────────
+# Evita abrir posiciones que cargarian riesgo de gap de fin de semana.
+if friday_close:
+    print()
+    print("SENYAL M15: " + signal + " BLOQUEADA — cierre de semana (viernes >= 17:00 Madrid)")
     print("=" * 55)
     sys.exit(0)
 

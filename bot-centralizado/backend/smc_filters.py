@@ -223,3 +223,37 @@ def smc_summary(
         pass
 
     return result
+
+
+def smc_zones(df: pd.DataFrame, price: float) -> dict:
+    """
+    Rich SMC snapshot for display in monitors.
+
+    Returns:
+      bias   : 'BULLISH' | 'BEARISH' | 'NEUTRAL'
+      event  : structural event string ('CHoCH_BEAR', 'BoS_BULL', ...)
+      obs    : list of {type, low, high, inside} order blocks
+      fvgs   : list of {type, bottom, top, inside} fair value gaps
+    `inside` is True when `price` sits within the zone.
+    """
+    snap = {'bias': 'N/A', 'event': '', 'obs': [], 'fvgs': []}
+    try:
+        if df is None or len(df) < 15:
+            return snap
+
+        bias, event = _h4_bias_and_event(df)
+        snap['bias'], snap['event'] = bias, event
+
+        highs, lows = _find_swings(df, lookback=3)
+        for ob in _find_order_blocks(df, highs, lows):
+            ob = dict(ob)
+            ob['inside'] = ob['low'] <= price <= ob['high']
+            snap['obs'].append(ob)
+        for fvg in _find_fvgs(df, lookback=30):
+            fvg = dict(fvg)
+            fvg['inside'] = fvg['bottom'] <= price <= fvg['top']
+            snap['fvgs'].append(fvg)
+    except Exception:
+        pass
+
+    return snap

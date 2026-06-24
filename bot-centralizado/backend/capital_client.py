@@ -183,13 +183,33 @@ class CapitalClient:
         return None
 
     def modify_position(self, deal_id: str, stop_loss: float = None, take_profit: float = None) -> bool:
-        """Modificar SL/TP de una posicion abierta."""
+        """Modificar SL/TP de una posicion abierta.
+
+        OJO: el endpoint PUT de Capital.com reemplaza el estado completo. Si se
+        envia solo stopLevel, el profitLevel ausente se BORRA (y viceversa). Para
+        evitarlo, cuando solo se pasa un nivel se preserva el otro leyendolo de la
+        posicion actual.
+        """
         if not self.ensure_session():
             return False
+
+        # Preservar el nivel no especificado para no borrarlo en el broker
+        if stop_loss is None or take_profit is None:
+            try:
+                for p in (self.get_positions() or []):
+                    if p.get('deal_id') == deal_id:
+                        if stop_loss is None:
+                            stop_loss = p.get('stop_loss')
+                        if take_profit is None:
+                            take_profit = p.get('take_profit')
+                        break
+            except Exception:
+                pass
+
         payload = {}
-        if stop_loss is not None:
+        if stop_loss is not None and stop_loss > 0:
             payload["stopLevel"] = round(stop_loss, 2)
-        if take_profit is not None:
+        if take_profit is not None and take_profit > 0:
             payload["profitLevel"] = round(take_profit, 2)
         if not payload:
             return False

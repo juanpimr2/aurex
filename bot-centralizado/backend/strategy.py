@@ -26,9 +26,10 @@ from typing import Optional, Dict
 
 @dataclass
 class StrategyConfig:
-    # Optimizado con backtest DAY 500 velas (Aug 2024 - Mar 2026):
+    # Backtest DAY walk-forward (Nov 2024 - Jun 2026, 24 trades, datos Capital.com):
     # EMA 8/21/50 | SL 2.0x | TP 2.5x | RSI 65/35
-    # Win Rate: 46.7% | PF: 2.26 | Return: +441% | MaxDD: 26.9%
+    # Win Rate: 62.5% | PF: 2.02 | Return: +15.3% (~0.8%/mes) | MaxDD: 3.0%
+    # Nota: cifra +441% previa era de dataset no reproducible; estos son datos frescos.
     ema_fast: int = 8
     ema_slow: int = 21
     ema_long: int = 50

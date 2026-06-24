@@ -12,7 +12,7 @@ Directorio backend: `C:\Users\sagas\OneDrive\Escritorio\Documentos\BotMillonario
 - **Balance actual:** $368.13 (actualizado 12 Jun 2026)
 - **P&L neto total:** +$118.13 (+47.2% desde inicio)
 - **Semana 9-12 Jun:** SWING ~+$34 (3 trades TP) | M15 -$15.08 (2 SL) | SCALP 0 trades
-- **Objetivo mensual:** 10-15% (~$37-55/mes con balance actual). 20% posible en meses con tendencia fuerte.
+- **Objetivo mensual realista:** SWING backtest fresco (Nov2024-Jun2026, 24 trades) da +15.3% en 19 meses (~0.8%/mes), WR 62.5%, PF 2.02, MaxDD 3.0%. El "10-15%/mes" previo NO está respaldado por datos reproducibles. Meta sensata: 2-5%/mes combinando los 3 niveles cuando haya tendencia.
 
 ---
 
@@ -45,7 +45,7 @@ Directorio backend: `C:\Users\sagas\OneDrive\Escritorio\Documentos\BotMillonario
 | Volumen | > 1.2 × SMA(20) | Confirma actividad real |
 | ATR_VOL_MULT | **1.2** (bajado de 1.5 el 11 Jun 2026) | Filtro volatilidad menos restrictivo |
 
-**Backtest (13 meses H1 GOLD):** 42.9% Win Rate | PF 1.72 | ~12.7%/mes | MaxDD 7%
+**Backtest SCALP:** ⚠️ NO validado con datos actuales — la API Capital.com solo devuelve ~1 mes de H1 (1 trade) y ~4 meses de H4 (2 trades). Cifras previas (42.9% WR, PF 1.72, 12.7%/mes) no son reproducibles. Tratar SCALP como experimental hasta acumular más historial real en trade_log.csv.
 
 ---
 
@@ -125,6 +125,8 @@ monitor_scalp.py
 | `monitor_m15_obs.py` | Monitor M15 observacion — paper trading, sin dinero real |
 | `session_report_daily.py` | Reporte diario de cierre — analiza P&L, fallos y mejoras |
 | `strategy.py` | Presets (SCALP, SWING, SWING_CONSERVATIVE) |
+| `smc_filters.py` | Smart Money Concepts — FVG/OB/BoS/CHoCH (`smc_zones`, `smc_summary`) |
+| `macro_context.py` | Capa de noticias/eventos macro — calendario FOMC+NFP + watchlist fuentes oficiales |
 | `capital_client.py` | API wrapper Capital.com |
 | `backtester.py` | Backtest walk-forward con spread real |
 | `bt_multi.py` | Comparativa multi-estrategia |
@@ -136,6 +138,14 @@ monitor_scalp.py
 | `daily_reports/` | Reportes diarios guardados en archivo |
 
 ---
+
+## Capa de noticias / contexto macro (macro_context.py)
+
+Refina la regla "noticias = solo contexto" en 2 capas. **NUNCA dispara operaciones.**
+
+- **Capa 1 — Calendario determinista** (`macro_context.py`, sin red): eventos de alto impacto con fecha fija/calculable (FOMC oficial 2026 + NFP = primer viernes de mes). Devuelve nivel de cautela (ALTA/MEDIA/BAJA) según proximidad. Integrado en `monitor_swing.py` (sección CONTEXTO MACRO). Cerca de un FOMC/NFP → señales técnicas menos fiables, esperar volatilidad.
+- **Capa 2 — Noticias en vivo** (Claude + WebSearch): en los crons de reporte diario y briefing semanal, revisar SOLO fuentes oficiales (`federalreserve.gov`, `treasury.gov`, `bls.gov`, `whitehouse.gov`) — Fed, geopolítica firmada (Irán/Rusia), aranceles, datos macro. Ver `MACRO_WATCHLIST` en el módulo.
+- **Lección 17-19 jun 2026:** acuerdo EE.UU.-Irán (15 jun) fue alcista para el oro (+2.7%), pero el oro colapsó 180+ pts los días siguientes y nuestro SELL técnico ganó. La reacción inicial a noticias suele revertirse → operar SIEMPRE por técnico, usar noticia solo para entender el porqué.
 
 ## Reglas de conducta del agente
 

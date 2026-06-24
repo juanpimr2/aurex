@@ -9,9 +9,9 @@ MODO ACTUAL: OBSERVACION (paper trading)
   - No ejecuta trades reales hasta validacion de 2-3 semanas.
   - Log en swing_signal_log.csv
 
-Estrategia SWING (backtest DAY 500 velas, Aug2024-Mar2026):
+Estrategia SWING (backtest DAY walk-forward, Nov2024-Jun2026, 24 trades):
   EMA 8/21/50 | RSI 14 (35-65) | SL 2xATR | TP 2.5xATR
-  Win Rate: 46.7% | PF: 2.26 | Return: +441% | MaxDD: 26.9%
+  Win Rate: 62.5% | PF: 2.02 | Return: +15.3% (~0.8%/mes) | MaxDD: 3.0%
 
 Confirmacion: H4 como filtro de entrada (mismo rol que H4 en SCALP H1)
 """
@@ -23,11 +23,13 @@ import csv
 from datetime import datetime, timezone
 from capital_client import CapitalClient
 from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_position_size
+from smc_filters import smc_zones
+from macro_context import macro_context
 
 EPIC     = 'GOLD'
 RISK_PCT = 5.0
 LOG_PATH = os.path.join(os.path.dirname(__file__), 'swing_signal_log.csv')
-MODO_REAL = True    # Activado 17 Apr 2026 — backtest 500 velas (WR 46.7%, PF 2.26, +441%)
+MODO_REAL = True    # Activado 17 Apr 2026 — backtest walk-forward (WR 62.5%, PF 2.02, +15.3% en 19 meses)
 
 
 # ── Auto-cierre SWING: detectar posiciones PENDIENTE que cerraron en broker ─
@@ -242,6 +244,29 @@ elif day_bear and not h4_bear:
 else:
     mtf_align = "SIN TENDENCIA CLARA (lateral)"
 print("  MTF Alineacion: " + mtf_align)
+
+# ── Estructura SMC (Smart Money Concepts) — informativo ────────────────────
+print()
+print("ESTRUCTURA SMC  (FVG / OB / BoS-CHoCH)")
+for tf_name, df_tf in [("DAY", df_day), ("H4", df_h4)]:
+    z = smc_zones(df_tf, current_price)
+    ev = (" | " + z['event']) if z['event'] else ""
+    print("  " + tf_name + " | Bias: " + str(z['bias']) + ev)
+    for ob in z['obs']:
+        tag = "  <- PRECIO DENTRO" if ob['inside'] else ""
+        print("    OB  " + ob['type'] + ": " + str(round(ob['low'], 2))
+              + " - " + str(round(ob['high'], 2)) + tag)
+    for fv in z['fvgs']:
+        tag = "  <- PRECIO DENTRO" if fv['inside'] else ""
+        print("    FVG " + fv['type'] + ": " + str(round(fv['bottom'], 2))
+              + " - " + str(round(fv['top'], 2)) + tag)
+
+# ── Contexto macro (calendario eventos alto impacto) — informativo ─────────
+mc = macro_context(now_utc)
+print()
+print("CONTEXTO MACRO  (solo contexto, NUNCA trigger)")
+print("  Cautela: " + mc["caution"])
+print("  " + mc["message"])
 
 # ── Senal DAY ─────────────────────────────────────────────────────────────
 signal = None
