@@ -50,3 +50,6 @@ desktop.ini
 
 # --- Claude Code session ---
 .claude/
+
+# Backups locales (no subir)
+*.bak

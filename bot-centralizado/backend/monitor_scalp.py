@@ -174,18 +174,21 @@ def auto_close_swing_trades(positions, equity_now, now_str):
                     if expected_sl_pnl > 0 and abs(pnl + expected_sl_pnl) < expected_sl_pnl * 0.4:
                         pnl = -expected_sl_pnl
             else:
-                result = 'CERRADO'
-                pnl    = 0.0
+                # Sin eq_open no podemos calcular el P&L real. NO inventamos 0.0
+                # (pareceria un breakeven enganoso); lo marcamos como no determinado.
+                result = 'CERRADO_SIN_PNL'
+                pnl    = ''
         except Exception:
-            result = 'CERRADO'
-            pnl    = 0.0
+            result = 'CERRADO_SIN_PNL'
+            pnl    = ''
 
         rows[idx]['resultado']       = result
         rows[idx]['pnl_teorico_usd'] = pnl
         rows[idx]['notas']           = notas + ' | AUTO-CERRADO ' + result + ' ' + now_str
         changed = True
+        pnl_disp = ("$" + str(pnl)) if pnl != '' else "no determinado (sin eq_open)"
         print("  [AUTO-CIERRE SWING] " + row.get('direction', '') + " " + row.get('epic', '')
-              + " -> " + result + " | P&L: $" + str(pnl))
+              + " -> " + result + " | P&L: " + pnl_disp)
 
     if changed:
         fieldnames = list(rows[0].keys())
