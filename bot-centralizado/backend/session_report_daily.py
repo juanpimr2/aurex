@@ -243,12 +243,17 @@ if swing_all:
     swing_all_tp     = [s for s in swing_all_cerr if 'TP' in str(s.get('resultado', '')).upper()]
     swing_all_sl     = [s for s in swing_all_cerr if 'SL' in str(s.get('resultado', '')).upper()]
     swing_pnl_acum   = sum(float(s.get('pnl_teorico_usd') or 0) for s in swing_all_cerr)
-    swing_wr = round(len(swing_all_tp) / len(swing_all_cerr) * 100, 1) if swing_all_cerr else 0
+    # WR solo sobre resultados DECISIVOS (TP vs SL); los "CERRADO" breakeven/sin
+    # P&L computado no diluyen el win rate.
+    swing_decisivos  = len(swing_all_tp) + len(swing_all_sl)
+    swing_breakeven  = len(swing_all_cerr) - swing_decisivos
+    swing_wr = round(len(swing_all_tp) / swing_decisivos * 100, 1) if swing_decisivos else 0
     print()
     print("SWING ACUMULADO")
     print("  Trades totales    : " + str(len(swing_all_real)) + " (" + str(len(swing_all_cerr)) + " cerrados)")
-    print("  TP / SL           : " + str(len(swing_all_tp)) + " / " + str(len(swing_all_sl)))
-    print("  Win Rate SWING    : " + str(swing_wr) + "%")
+    print("  TP / SL           : " + str(len(swing_all_tp)) + " / " + str(len(swing_all_sl))
+          + (" (+" + str(swing_breakeven) + " breakeven)" if swing_breakeven else ""))
+    print("  Win Rate SWING    : " + str(swing_wr) + "% (sobre " + str(swing_decisivos) + " decisivos)")
     print("  P&L SWING acum.   : $" + str(round(swing_pnl_acum, 2)))
 
 # -- Analisis de fallos
@@ -291,22 +296,51 @@ if mejoras:
     for i, m in enumerate(mejoras, 1):
         print("  " + str(i) + ". " + m)
 
-# -- Comparacion vs backtest
+# -- Contexto historico (CONSOLIDADO: trades REALES de SCALP + SWING + M15)
+# Antes solo leia trade_log.csv (vacio si SCALP no opera) y mostraba cifras
+# hardcodeadas. Ahora suma los trades reales de los tres signal logs.
 print()
-print("CONTEXTO HISTORICO")
-print("  Backtest H1 esperado : ~12-14%/mes | ~$30-35/mes con $250")
-print("  Objetivo realista/dia: $1.0 - $1.5 promedio (algunos dias positivo, otros negativo)")
-print("  Trades totales acum  : " + str(len(all_trades)))
+print("CONTEXTO HISTORICO (trades REALES consolidados)")
+print("  Referencia backtest  : SWING +15.3% en 19 meses (~0.8%/mes, WR 62.5%, PF 2.02)")
+print("  Meta realista        : 2-5%/mes combinando niveles cuando hay tendencia")
 
-tp_total  = sum(1 for t in all_trades if t.get('result','').upper() == 'TP')
-sl_total  = sum(1 for t in all_trades if t.get('result','').upper() == 'SL')
-pnl_acum  = sum(float(t.get('pnl_usd') or 0) for t in all_trades)
+# 1) SCALP desde trade_log.csv
+scalp_tp  = sum(1 for t in all_trades if t.get('result','').upper() == 'TP')
+scalp_sl  = sum(1 for t in all_trades if t.get('result','').upper() == 'SL')
+scalp_pnl = sum(float(t.get('pnl_usd') or 0) for t in all_trades)
+
+# 2) SWING real cerrados desde swing_signal_log.csv
+swing_real_all = [s for s in swing_all if 'real' in str(s.get('notas','')).lower()]
+swing_cerr_all = [s for s in swing_real_all if 'PENDIENTE' not in str(s.get('resultado',''))]
+swing_tp_all   = sum(1 for s in swing_cerr_all if 'TP' in str(s.get('resultado','')).upper())
+swing_sl_all   = sum(1 for s in swing_cerr_all if 'SL' in str(s.get('resultado','')).upper())
+swing_pnl_all  = sum(float(s.get('pnl_teorico_usd') or 0) for s in swing_cerr_all)
+
+# 3) M15 real cerrados desde m15_signal_log.csv
+m15_all = []
+if os.path.exists(M15_LOG):
+    with open(M15_LOG, newline='', encoding='utf-8') as f:
+        m15_all = list(csv.DictReader(f))
+m15_real_all = [s for s in m15_all if 'REAL' in str(s.get('notas','')).upper()]
+m15_cerr_all = [s for s in m15_real_all if str(s.get('resultado','')).upper().startswith(('TP','SL','CERRADO'))]
+m15_tp_all   = sum(1 for s in m15_cerr_all if str(s.get('resultado','')).upper().startswith('TP'))
+m15_sl_all   = sum(1 for s in m15_cerr_all if str(s.get('resultado','')).upper().startswith('SL'))
+m15_pnl_all  = sum(float(s.get('pnl_teorico_usd') or 0) for s in m15_cerr_all)
+
+# Consolidado real
+tp_total  = scalp_tp + swing_tp_all + m15_tp_all
+sl_total  = scalp_sl + swing_sl_all + m15_sl_all
+pnl_acum  = scalp_pnl + swing_pnl_all + m15_pnl_all
 cerr_tot  = tp_total + sl_total
 wr_total  = round(tp_total / cerr_tot * 100, 1) if cerr_tot > 0 else 0
 
-print("  TP acumulados        : " + str(tp_total) + " | SL: " + str(sl_total))
-print("  Win Rate total       : " + str(wr_total) + "%")
-print("  P&L acumulado        : $" + str(round(pnl_acum, 2)))
+print("  --- Desempeno REAL acumulado por nivel (TP/SL | P&L) ---")
+print("  SCALP : " + str(scalp_tp) + "/" + str(scalp_sl) + " | $" + str(round(scalp_pnl, 2)))
+print("  SWING : " + str(swing_tp_all) + "/" + str(swing_sl_all) + " | $" + str(round(swing_pnl_all, 2)))
+print("  M15   : " + str(m15_tp_all) + "/" + str(m15_sl_all) + " | $" + str(round(m15_pnl_all, 2)))
+print("  TP totales           : " + str(tp_total) + " | SL: " + str(sl_total))
+print("  Win Rate total REAL  : " + str(wr_total) + "%")
+print("  P&L acumulado REAL   : $" + str(round(pnl_acum, 2)))
 
 # -- Guardar reporte
 report_path = os.path.join(REPORT_DIR, 'report_' + today + '.txt')
