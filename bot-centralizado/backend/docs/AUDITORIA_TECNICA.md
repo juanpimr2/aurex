@@ -98,9 +98,9 @@
 
 ### 🔴 Urgente / riesgo alto
 - [ ] **B1. Scheduler resiliente del SO** (Task Scheduler de Windows) que lance los monitores aunque la sesión Claude no esté → elimina R1. *(Cambia infraestructura, no estrategia. Requiere tu OK.)*
-- [ ] **B2. Logging estructurado + captura de errores** en los 3 monitores: fichero `logs/aurex_YYYY-MM.log` con timestamp, monitor, señal, decisión, respuesta broker, errores. Rotación mensual. → mitiga R4.
-- [ ] **B3. Backup automático diario** (cron que llame a `backup_aurex.py`) + verificación. → cierra R2.
-- [ ] **B4. Dump de la BD a git** (export a `.sql`/`.csv` en cada reporte). → cierra R2.
+- [x] **B2. Logging estructurado + captura de errores** — `aurex_logger.py` (log mensual) + `run_monitor.py` (wrapper que ejecuta cada monitor capturando salida/errores/duración sin tocar su código). → mitiga R4. *(Hecho 26-jun)*
+- [x] **B3. Backup automático diario** — `daily_backup.py` + `backup_aurex.py` (backup verificado + poda). Falta activar el cron diario. → cierra R2. *(Hecho 26-jun)*
+- [x] **B4. Dump de la BD a git** — `dump_db.py` → `aurex_trades_dump.csv` versionable. → cierra R2. *(Hecho 26-jun)*
 
 ### 🟡 Importante
 - [ ] **B5. Unificar persistencia:** que SWING y SCALP también escriban en `aurex_trades.db` (fuente única). → R3.
