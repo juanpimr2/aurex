@@ -53,3 +53,6 @@ desktop.ini
 
 # Backups locales (no subir)
 *.bak
+
+# Backups locales generados por backup_aurex.py
+backups/
