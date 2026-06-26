@@ -42,7 +42,10 @@ DATA_FILES = [
 ]
 DATA_DIRS = [
     'daily_reports',
+    'logs',
 ]
+# Cuantos backups conservar (poda los mas antiguos). 0 = no podar.
+KEEP_LAST = int(os.environ.get('AUREX_BACKUP_KEEP', '30'))
 # Patrones que NUNCA se respaldan (seguridad).
 DENY = ('.env', '.bak', '__pycache__')
 
@@ -106,7 +109,21 @@ def create_backup() -> str:
     # Verificacion inmediata
     ok = verify_backup(dest)
     print('[BACKUP] Integridad: ' + ('OK' if ok else 'FALLO'))
+    _prune()
     return dest
+
+
+def _prune():
+    """Conserva solo los KEEP_LAST backups mas recientes."""
+    if KEEP_LAST <= 0 or not os.path.isdir(BACKUP_ROOT):
+        return
+    items = sorted(
+        d for d in os.listdir(BACKUP_ROOT) if d.startswith('aurex_backup_')
+    )
+    excess = len(items) - KEEP_LAST
+    for d in items[:max(0, excess)]:
+        shutil.rmtree(os.path.join(BACKUP_ROOT, d), ignore_errors=True)
+        print('[BACKUP] Podado antiguo: ' + d)
 
 
 def verify_backup(path: str) -> bool:
