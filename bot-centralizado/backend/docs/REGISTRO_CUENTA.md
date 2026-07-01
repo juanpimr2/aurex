@@ -1,5 +1,5 @@
 # AUREX — REGISTRO HISTORICO DE CUENTA
-> Actualizado automaticamente: 2026-06-29 | Fuente: trade_log.csv
+> Actualizado automaticamente: 2026-07-01 | Fuente: trade_log.csv
 
 ---
 
