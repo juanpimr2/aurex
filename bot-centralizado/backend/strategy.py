@@ -67,11 +67,11 @@ STRATEGY_PRESETS: Dict[str, dict] = {
         "params": {
             "ema_fast": 8, "ema_slow": 21, "ema_long": 50,
             "rsi_period": 14, "rsi_overbought": 65.0, "rsi_oversold": 35.0,
-            "atr_period": 14, "atr_sl_mult": 2.0, "atr_tp_mult": 2.5,
+            "atr_period": 14, "atr_sl_mult": 2.0, "atr_tp_mult": 3.5,
             "bb_period": 20, "bb_std": 2.0, "vol_sma_period": 50,
             "vol_mult": 1.0, "risk_pct": 1.5,
             "preset_name": "SWING",
-            "preset_description": "Swing trading diario. SL 2xATR, TP 2.5xATR. R:R 1:2.5.",
+            "preset_description": "Swing trading diario. SL 2xATR, TP 3.5xATR. R:R 1:1.75.",
             "recommended_timeframe": "DAY",
         },
     },

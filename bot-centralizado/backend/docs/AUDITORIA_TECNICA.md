@@ -133,4 +133,14 @@
 
 ---
 
+## 7. Registro de cambios de ESTRATEGIA (aprobados por el usuario)
+
+| Fecha | Cambio | Respaldo | Aprobación |
+|-------|--------|----------|------------|
+| 01-jul-2026 | **SWING: TP `atr_tp_mult` 2.5 → 3.5×ATR** (R:R 1:1.25 → 1:1.75). SL (2.0×) y riesgo (5%) intactos. | Backtest R:R (`bt_rr_swing.py`, 27 meses): la franja de TP amplio supera al actual de forma robusta (PF 2.0→3.01). Walk-forward (`bt_wf_swing.py`, 4 tramos): la propuesta gana en 3/4 tramos y pierde menos en el peor; MaxDD idéntico (SL sin cambiar). | ✅ Usuario, 01-jul-2026 |
+
+**Razón:** SWING captura tendencias largas del oro; el TP 2.5× cortaba las ganancias demasiado pronto. Ampliar solo el TP deja correr los trades sin añadir riesgo (SL fijo). Ampliar el SL se descartó por datos (empeora). Solo afecta a trades SWING **futuros**; no había posición abierta al aplicarlo.
+
+---
+
 *Mantener este documento al día. Cada cambio: analizar → verificar → documentar → probar → registrar.*
