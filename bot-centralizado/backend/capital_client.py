@@ -240,6 +240,48 @@ class CapitalClient:
             print(f"[CapitalClient] close_position error: {e}")
         return False
 
+    def get_activity_history(self, from_date: str = None, to_date: str = None,
+                             detailed: bool = True) -> List[Dict]:
+        """Historial de actividad de la cuenta (aperturas/cierres/modificaciones).
+        SOLO LECTURA. Fechas formato 'YYYY-MM-DDTHH:MM:SS'. Devuelve lista cruda
+        de actividades; el campo 'detailed=true' incluye nivel y tamano."""
+        if not self.ensure_session():
+            return []
+        params = {"detailed": "true" if detailed else "false"}
+        if from_date:
+            params["from"] = from_date
+        if to_date:
+            params["to"] = to_date
+        try:
+            r = self.session.get(f"{self.base_url}/history/activity",
+                                 params=params, timeout=15)
+            if r.status_code == 200:
+                return r.json().get("activities", [])
+            print(f"[CapitalClient] get_activity_history error: {r.status_code}")
+        except Exception as e:
+            print(f"[CapitalClient] get_activity_history exception: {e}")
+        return []
+
+    def get_transaction_history(self, from_date: str = None, to_date: str = None) -> List[Dict]:
+        """Historial de transacciones (P&L realizados, depositos, etc).
+        SOLO LECTURA. Fuente de verdad para el P&L real de cada cierre."""
+        if not self.ensure_session():
+            return []
+        params = {}
+        if from_date:
+            params["from"] = from_date
+        if to_date:
+            params["to"] = to_date
+        try:
+            r = self.session.get(f"{self.base_url}/history/transactions",
+                                 params=params, timeout=15)
+            if r.status_code == 200:
+                return r.json().get("transactions", [])
+            print(f"[CapitalClient] get_transaction_history error: {r.status_code}")
+        except Exception as e:
+            print(f"[CapitalClient] get_transaction_history exception: {e}")
+        return []
+
     def get_market_info(self, epic: str) -> Optional[Dict]:
         if not self.ensure_session():
             return None
