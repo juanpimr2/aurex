@@ -13,7 +13,7 @@ Parámetros por defecto (SWING):
   EMA larga:    50
   RSI:          14  (entrar si RSI entre 35-65)
   ATR SL mult:  2.0  (estándar profesional: Van Tharp, BabyPips)
-  ATR TP mult:  2.5
+  ATR TP mult:  3.5  (aprobado 1-jul-2026, validado backtest+walk-forward)
   BB period:    20, desv: 2.0
   Vol mult:     1.0 (volumen > media de 50)
   Risk:         1.5% por operación
@@ -38,7 +38,7 @@ class StrategyConfig:
     rsi_oversold: float = 35.0
     atr_period: int = 14
     atr_sl_mult: float = 2.0    # 2.0x ATR = estándar profesional (Van Tharp)
-    atr_tp_mult: float = 2.5
+    atr_tp_mult: float = 3.5    # 3.5x aprobado 1-jul-2026 (igual que preset SWING)
     bb_period: int = 20
     bb_std: float = 2.0
     vol_sma_period: int = 50
