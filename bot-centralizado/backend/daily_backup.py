@@ -25,6 +25,19 @@ log = get_logger('daily_backup')
 
 def main():
     log.info('START daily_backup')
+
+    # F1.1: acumular velas historicas ANTES del backup (asi la copia del dia
+    # las incluye). Solo lectura sobre el broker; si falla, NO bloquea el backup.
+    try:
+        import collect_candles
+        res = collect_candles.collect()
+        resumen = ', '.join(tf + ':+' + str(v) for tf, v in res.items() if v >= 0)
+        log.info('Candles: ' + resumen)
+        print('[DAILY] Velas acumuladas -> ' + resumen)
+    except Exception as e:
+        log.error('Candle collector fallo: ' + str(e))
+        print('AVISO: collector de velas fallo (' + str(e) + '), sigo con backup')
+
     try:
         n = dump_db.dump()
         log.info('DB dump: ' + str(n) + ' filas')

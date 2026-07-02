@@ -29,22 +29,32 @@ class CapitalClient:
         self.session = requests.Session()
         self.is_logged_in = False
 
-    def login(self) -> bool:
+    def login(self, retries: int = 2, backoff_sec: float = 3.0) -> bool:
+        """Login con reintentos: los 'Read timed out' puntuales de la API son
+        recurrentes en produccion y cada fallo pierde un ciclo de monitor.
+        Reintenta `retries` veces con espera creciente (3s, 6s)."""
         headers = {"X-CAP-API-KEY": self.api_key, "Content-Type": "application/json"}
         data = {"identifier": self.email, "password": self.password}
-        try:
-            r = self.session.post(f"{self.base_url}/session", headers=headers, json=data, timeout=10)
-            if r.status_code == 200:
-                self.session.headers.update({
-                    "X-SECURITY-TOKEN": r.headers.get("X-SECURITY-TOKEN", ""),
-                    "CST": r.headers.get("CST", ""),
-                    "Content-Type": "application/json",
-                })
-                self.is_logged_in = True
-                return True
-            print(f"[CapitalClient] Login failed: {r.status_code} - {r.text[:200]}")
-        except Exception as e:
-            print(f"[CapitalClient] Login error: {e}")
+        for attempt in range(retries + 1):
+            if attempt > 0:
+                time.sleep(backoff_sec * attempt)
+                print(f"[CapitalClient] Login retry {attempt}/{retries}...")
+            try:
+                r = self.session.post(f"{self.base_url}/session", headers=headers, json=data, timeout=10)
+                if r.status_code == 200:
+                    self.session.headers.update({
+                        "X-SECURITY-TOKEN": r.headers.get("X-SECURITY-TOKEN", ""),
+                        "CST": r.headers.get("CST", ""),
+                        "Content-Type": "application/json",
+                    })
+                    self.is_logged_in = True
+                    return True
+                # 4xx (credenciales/permiso) no se arregla reintentando
+                print(f"[CapitalClient] Login failed: {r.status_code} - {r.text[:200]}")
+                if 400 <= r.status_code < 500 and r.status_code != 429:
+                    return False
+            except Exception as e:
+                print(f"[CapitalClient] Login error: {e}")
         return False
 
     def ensure_session(self) -> bool:
