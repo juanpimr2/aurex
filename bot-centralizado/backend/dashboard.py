@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Aurex — Dashboard v1 (Fase 2)
-=============================
-Panel local de SOLO LECTURA: muestra estado de cuenta, posiciones, historial
-real del broker (tabla trade_closes de la reconciliacion), curva de P&L y
-salud del sistema. CERO botones de accion: ver, no tocar.
+Aurex — Dashboard v1.1 "Bóveda" (Fase 2)
+========================================
+Panel local de SOLO LECTURA: estado de cuenta, posiciones, historial real del
+broker (tabla trade_closes de la reconciliación), curva de P&L y salud del
+sistema. CERO botones de acción: ver, no tocar.
 
+Estética: bóveda suiza x terminal — obsidiana, oro 999.9, Marcellus + Plex Mono.
 No expone secretos. Solo escucha en localhost.
 
 Uso:  python dashboard.py   ->  http://localhost:8181
@@ -43,7 +44,7 @@ def _monitor_health():
             return out
         with open(path, encoding='utf-8', errors='replace') as f:
             lines = f.readlines()[-400:]
-        # Formato: '2026-07-02 11:22:20 UTC | INFO | aurex.monitor_m15_obs | END monitor_m15_obs.py | rc=0 | 3.2s'
+        # '2026-07-02 11:22:20 UTC | INFO | aurex.monitor_m15_obs | END ... | rc=0 | 3.2s'
         pat = re.compile(
             r'^(\S+ \S+) UTC \|.*\| aurex\.(monitor_[a-z0-9_]+) \| END .*rc=(\d+)')
         for ln in lines:
@@ -144,14 +145,15 @@ def build_status():
         pass
 
     gold_open = any(p['aurex'] for p in positions)
-    estado = 'OPERANDO — posicion GOLD abierta' if gold_open else 'OPERATIVO — esperando senal'
+    estado = 'OPERANDO — posición GOLD abierta' if gold_open else 'OPERATIVO — esperando señal'
     if not broker_ok:
-        estado = 'ERROR — sin conexion con broker'
+        estado = 'ERROR — sin conexión con broker'
 
     data = {
         'updated': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
         'estado': estado,
         'broker_ok': broker_ok,
+        'gold_open': gold_open,
         'precio_gold': precio,
         'balance': balance,
         'positions': positions,
@@ -170,127 +172,233 @@ def api_status():
     return jsonify(build_status())
 
 
-PAGE = """
+PAGE = r"""
 <!doctype html><html lang="es"><head><meta charset="utf-8">
-<title>Aurex — Panel</title>
+<title>AUREX · Bóveda</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
-  :root { --bg:#0d1117; --card:#161b22; --line:#30363d; --tx:#e6edf3;
-          --dim:#8b949e; --green:#3fb950; --red:#f85149; --gold:#e3b341; }
-  * { box-sizing:border-box; margin:0; }
-  body { background:var(--bg); color:var(--tx);
-         font:14px/1.5 -apple-system,'Segoe UI',sans-serif; padding:18px; }
-  .wrap { max-width:880px; margin:0 auto; display:grid; gap:14px; }
-  .card { background:var(--card); border:1px solid var(--line);
-          border-radius:10px; padding:16px; }
-  h1 { font-size:19px; display:flex; align-items:center; gap:10px; }
-  h2 { font-size:13px; color:var(--dim); text-transform:uppercase;
-       letter-spacing:.06em; margin-bottom:10px; }
-  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
-  .ok { background:var(--green); } .bad { background:var(--red); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
-  .kpi .v { font-size:21px; font-weight:600; } .kpi .l { color:var(--dim); font-size:12px; }
-  .pos { color:var(--green); } .neg { color:var(--red); } .gold { color:var(--gold); }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  td,th { padding:5px 8px; text-align:left; border-bottom:1px solid var(--line); }
-  th { color:var(--dim); font-weight:500; }
-  .tag { font-size:11px; padding:1px 7px; border-radius:99px;
-         border:1px solid var(--line); color:var(--dim); }
-  .muted { color:var(--dim); font-size:12px; }
+:root{
+  --obsidian:#0b0a08; --pit:#070605; --card:#12100c; --card2:#161310;
+  --line:#2a2419; --line-gold:#3d3320;
+  --gold:#d4af37; --gold-hi:#f3d878; --gold-dim:#8a7434;
+  --tx:#ece5d3; --dim:#9c917a; --faint:#5f584a;
+  --up:#7fd6a4; --down:#e5646a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+::selection{background:var(--gold);color:#0b0a08}
+html{scrollbar-color:var(--line-gold) var(--pit)}
+body{
+  background:var(--obsidian); color:var(--tx);
+  font:14px/1.55 'IBM Plex Mono',monospace;
+  min-height:100vh; padding:26px 18px 40px;
+  background-image:
+    radial-gradient(ellipse 900px 420px at 50% -80px, rgba(212,175,55,.09), transparent 60%),
+    radial-gradient(ellipse 1400px 800px at 50% 120%, rgba(0,0,0,.5), transparent);
+}
+/* grano sutil */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:9;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");}
+/* hairline dorada superior */
+body::after{content:'';position:fixed;top:0;left:0;right:0;height:1px;z-index:10;
+  background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold-hi) 50%,var(--gold) 70%,transparent);}
+.wrap{max-width:920px;margin:0 auto;display:grid;gap:16px}
+
+/* ── cabecera ── */
+header.card{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:16px}
+.wordmark{
+  font-family:'Marcellus',serif; font-size:34px; letter-spacing:.34em; line-height:1;
+  background:linear-gradient(100deg,#9a7d2e 0%,var(--gold) 25%,var(--gold-hi) 50%,var(--gold) 75%,#9a7d2e 100%);
+  background-size:200% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:shimmer 7s linear infinite; padding-right:.34em;
+}
+@keyframes shimmer{to{background-position:-200% 0}}
+.hallmark{
+  font-size:9.5px;letter-spacing:.22em;color:var(--gold-dim);
+  border:1px solid var(--line-gold);padding:5px 9px;border-radius:2px;white-space:nowrap;
+}
+.status{display:flex;align-items:center;gap:10px;font-size:12.5px;letter-spacing:.05em;color:var(--dim)}
+.pulse{position:relative;width:9px;height:9px;border-radius:50%;background:var(--gold)}
+.pulse::after{content:'';position:absolute;inset:-5px;border-radius:50%;
+  border:1px solid var(--gold);animation:ring 2.2s ease-out infinite}
+.pulse.bad{background:var(--down)} .pulse.bad::after{border-color:var(--down)}
+.pulse.live{background:var(--up)} .pulse.live::after{border-color:var(--up)}
+@keyframes ring{0%{transform:scale(.5);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+.updated{font-size:10.5px;color:var(--faint);letter-spacing:.08em;width:100%;text-align:right}
+
+/* ── tarjetas placa de bóveda ── */
+.card{position:relative;background:linear-gradient(180deg,var(--card2),var(--card));
+  border:1px solid var(--line);border-radius:3px;padding:20px 22px;
+  animation:reveal .7s cubic-bezier(.2,.7,.3,1) both}
+.card:nth-child(2){animation-delay:.06s}.card:nth-child(3){animation-delay:.12s}
+.card:nth-child(4){animation-delay:.18s}.card:nth-child(5){animation-delay:.24s}
+.card:nth-child(6){animation-delay:.3s}
+@keyframes reveal{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+/* esquinas grabadas art-decó */
+.card i.c{position:absolute;width:9px;height:9px;border:1px solid var(--gold-dim);pointer-events:none}
+.card i.c1{top:5px;left:5px;border-right:0;border-bottom:0}
+.card i.c2{top:5px;right:5px;border-left:0;border-bottom:0}
+.card i.c3{bottom:5px;left:5px;border-right:0;border-top:0}
+.card i.c4{bottom:5px;right:5px;border-left:0;border-top:0}
+
+h2{font-family:'Marcellus',serif;font-size:13px;font-weight:400;color:var(--gold);
+  letter-spacing:.28em;text-transform:uppercase;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px}
+h2::after{content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,var(--line-gold),transparent)}
+h2 .dia{color:var(--gold-dim);font-size:8px}
+
+/* ── KPIs ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
+.kpi{border-left:1px solid var(--line-gold);padding-left:14px}
+.kpi .v{font-size:24px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;
+  transition:color .4s}
+.kpi .l{color:var(--faint);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-top:3px}
+.pos{color:var(--up)} .neg{color:var(--down)} .goldtx{color:var(--gold-hi)}
+.kpi .v.flash{animation:flash .8s}
+@keyframes flash{0%{color:var(--gold-hi)}100%{}}
+
+/* ── tablas ── */
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+td,th{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{color:var(--faint);font-weight:500;font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+tbody tr{transition:background .25s}
+tbody tr:hover{background:rgba(212,175,55,.045)}
+tr:last-child td{border-bottom:0}
+.tag{font-size:9px;letter-spacing:.12em;padding:2px 7px;border-radius:2px;
+  border:1px solid var(--line-gold);color:var(--gold-dim);text-transform:uppercase}
+.muted{color:var(--faint);font-size:11.5px;letter-spacing:.04em}
+.empty{color:var(--faint);font-size:12px;padding:6px 0;letter-spacing:.06em}
+.empty b{color:var(--gold-dim);font-weight:500}
+
+/* precio oro destacado */
+.xau{display:flex;align-items:baseline;gap:8px}
+.xau .sym{font-family:'Marcellus',serif;color:var(--gold-dim);font-size:12px;letter-spacing:.2em}
+
+canvas{margin-top:4px}
+footer{color:var(--faint);font-size:9.5px;letter-spacing:.26em;text-align:center;
+  text-transform:uppercase;margin-top:6px}
+footer b{color:var(--gold-dim);font-weight:400}
+@media(max-width:560px){.wordmark{font-size:24px}.card{padding:16px}}
 </style></head><body><div class="wrap">
 
-<div class="card"><h1><span id="dot" class="dot ok"></span> AUREX
-  <span id="estado" class="muted"></span></h1>
-  <div class="muted" id="updated"></div></div>
+<header class="card"><i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
+  <div class="brand">
+    <div class="wordmark">AUREX</div>
+    <div class="hallmark">XAU · 999.9<br>CAPITAL.COM</div>
+  </div>
+  <div class="status"><span id="dot" class="pulse"></span><span id="estado">conectando…</span></div>
+  <div class="updated" id="updated"></div>
+</header>
 
-<div class="card"><h2>Cuenta</h2><div class="grid">
-  <div class="kpi"><div class="v" id="equity">—</div><div class="l">Equity (EUR)</div></div>
-  <div class="kpi"><div class="v" id="disponible">—</div><div class="l">Disponible</div></div>
-  <div class="kpi"><div class="v" id="flotante">—</div><div class="l">P&L flotante</div></div>
-  <div class="kpi"><div class="v gold" id="precio">—</div><div class="l">GOLD</div></div>
-</div></div>
+<section class="card"><i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
+  <h2><span class="dia">◆</span> Cuenta</h2>
+  <div class="grid">
+    <div class="kpi"><div class="v goldtx" id="equity">—</div><div class="l">Equity · EUR</div></div>
+    <div class="kpi"><div class="v" id="disponible">—</div><div class="l">Disponible</div></div>
+    <div class="kpi"><div class="v" id="flotante">—</div><div class="l">P&L flotante</div></div>
+    <div class="kpi"><div class="v goldtx xau"><span id="precio">—</span><span class="sym">XAU</span></div>
+      <div class="l">Oro · spot</div></div>
+  </div>
+</section>
 
-<div class="card"><h2>Posiciones</h2><div id="positions"></div></div>
+<section class="card"><i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
+  <h2><span class="dia">◆</span> Posiciones</h2><div id="positions"></div>
+</section>
 
-<div class="card"><h2>Resultados reales (verdad del broker)</h2>
-  <div class="grid" style="margin-bottom:10px">
-    <div class="kpi"><div class="v" id="tpnl">—</div><div class="l">P&L trades (EUR)</div></div>
+<section class="card"><i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
+  <h2><span class="dia">◆</span> Libro real del broker</h2>
+  <div class="grid" style="margin-bottom:14px">
+    <div class="kpi"><div class="v" id="tpnl">—</div><div class="l">P&L trades · EUR</div></div>
     <div class="kpi"><div class="v" id="wr">—</div><div class="l">Win rate</div></div>
     <div class="kpi"><div class="v" id="pf">—</div><div class="l">Profit factor</div></div>
     <div class="kpi"><div class="v" id="ntr">—</div><div class="l">Trades cerrados</div></div>
   </div>
-  <canvas id="curve" height="90"></canvas>
-  <div id="closes" style="margin-top:10px"></div></div>
+  <canvas id="curve" height="92"></canvas>
+  <div id="closes" style="margin-top:12px"></div>
+</section>
 
-<div class="card"><h2>Señales recientes</h2><div id="signals"></div></div>
+<section class="card"><i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
+  <h2><span class="dia">◆</span> Señales recientes</h2><div id="signals"></div>
+</section>
 
-<div class="card"><h2>Sistema</h2><div id="monitors"></div>
-  <div class="muted" style="margin-top:8px">Panel de solo lectura · sin acciones
-  · actualiza cada 30 s · datos del broker cacheados 20 s</div></div>
+<section class="card"><i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
+  <h2><span class="dia">◆</span> Sistema</h2><div id="monitors"></div>
+  <div class="muted" style="margin-top:10px">Solo lectura · sin acciones · refresco 30 s · broker cacheado 20 s</div>
+</section>
+
+<footer>Aurex <b>◆</b> panel de bóveda <b>◆</b> ver, no tocar</footer>
 
 </div><script>
-let chart;
-function money(v){ if(v==null||v==='')return '—';
-  const n=+v; return (n>=0?'+':'')+n.toFixed(2); }
-function cls(v){ return +v>=0?'pos':'neg'; }
+let chart, prevEquity=null;
+const $=id=>document.getElementById(id);
+function money(v){if(v==null||v==='')return '—';const n=+v;return (n>=0?'+':'')+n.toFixed(2);}
+function cls(v){return +v>=0?'pos':'neg';}
 async function refresh(){
-  const r = await fetch('/api/status'); const d = await r.json();
-  document.getElementById('estado').textContent = d.estado;
-  document.getElementById('updated').textContent = 'Actualizado: '+d.updated;
-  document.getElementById('dot').className = 'dot '+(d.broker_ok?'ok':'bad');
+  let d; try{ d = await (await fetch('/api/status')).json(); }catch(e){ return; }
+  $('estado').textContent = d.estado;
+  $('updated').textContent = d.updated;
+  $('dot').className = 'pulse ' + (!d.broker_ok?'bad': d.gold_open?'live':'');
   if(d.balance){
-    document.getElementById('equity').textContent = (+d.balance.balance).toFixed(2);
-    document.getElementById('disponible').textContent = (+d.balance.available).toFixed(2);
-    const f = document.getElementById('flotante');
-    f.textContent = money(d.balance.profit_loss); f.className='v '+cls(d.balance.profit_loss);
+    const eq=(+d.balance.balance).toFixed(2);
+    if(prevEquity!==null && eq!==prevEquity){$('equity').classList.remove('flash');void $('equity').offsetWidth;$('equity').classList.add('flash');}
+    prevEquity=eq;
+    $('equity').textContent = eq;
+    $('disponible').textContent = (+d.balance.available).toFixed(2);
+    $('flotante').textContent = money(d.balance.profit_loss);
+    $('flotante').className = 'v '+cls(d.balance.profit_loss);
   }
-  if(d.precio_gold) document.getElementById('precio').textContent = d.precio_gold.toFixed(2);
-  // posiciones
-  let ph = '';
-  if(!d.positions.length) ph = '<div class="muted">Sin posiciones — flat.</div>';
-  else { ph = '<table><tr><th></th><th>Dir</th><th>Size</th><th>Entrada</th><th>SL</th><th>TP</th><th>P&L</th></tr>';
+  if(d.precio_gold) $('precio').textContent = d.precio_gold.toFixed(2);
+  let ph='';
+  if(!d.positions.length) ph='<div class="empty">Sin posiciones — <b>la bóveda espera su momento.</b></div>';
+  else{ ph='<table><tr><th></th><th>Dir</th><th>Size</th><th>Entrada</th><th>SL</th><th>TP</th><th>P&L</th></tr>';
     for(const p of d.positions){
-      ph += `<tr><td>${p.epic} ${p.aurex?'':'<span class="tag">manual</span>'}</td>
+      ph+=`<tr><td>${p.epic} ${p.aurex?'':'<span class="tag">manual</span>'}</td>
       <td>${p.dir}</td><td>${p.size}</td><td>${p.entry??'—'}</td>
       <td>${p.sl||'<span class="neg">sin SL</span>'}</td><td>${p.tp||'—'}</td>
-      <td class="${cls(p.pnl)}">${money(p.pnl)}</td></tr>`; }
-    ph += '</table>'; }
-  document.getElementById('positions').innerHTML = ph;
-  // verdad broker
-  const t = d.truth;
-  document.getElementById('tpnl').textContent = money(t.total_pnl);
-  document.getElementById('tpnl').className = 'v '+cls(t.total_pnl);
-  document.getElementById('wr').textContent = t.wr!=null? t.wr+'%':'—';
-  document.getElementById('pf').textContent = t.pf??'—';
-  document.getElementById('ntr').textContent = t.n;
+      <td class="${cls(p.pnl)}">${money(p.pnl)}</td></tr>`;}
+    ph+='</table>';}
+  $('positions').innerHTML=ph;
+  const t=d.truth;
+  $('tpnl').textContent=money(t.total_pnl); $('tpnl').className='v '+cls(t.total_pnl);
+  $('wr').textContent=t.wr!=null?t.wr+'%':'—';
+  $('pf').textContent=t.pf??'—'; $('ntr').textContent=t.n;
   let ch=''; if(t.closes.length){
-    ch='<table><tr><th>Cierre</th><th>P&L (EUR)</th></tr>';
-    for(const c of t.closes) ch+=`<tr><td>${c.fecha}</td>
-      <td class="${cls(c.pnl)}">${money(c.pnl)}</td></tr>`;
-    ch+='</table>'; }
-  document.getElementById('closes').innerHTML = ch;
+    ch='<table><tr><th>Cierre</th><th>P&L · EUR</th></tr>';
+    for(const c of t.closes) ch+=`<tr><td>${c.fecha}</td><td class="${cls(c.pnl)}">${money(c.pnl)}</td></tr>`;
+    ch+='</table>';}
+  $('closes').innerHTML=ch;
   const labels=t.curve.map(x=>x.t), vals=t.curve.map(x=>x.v);
-  if(!chart){ chart = new Chart(document.getElementById('curve'),{type:'line',
-    data:{labels,datasets:[{data:vals,borderColor:'#e3b341',borderWidth:2,
-      pointRadius:0,fill:{target:'origin',above:'rgba(227,179,65,.08)'}}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e',
-      maxTicksLimit:8}},y:{ticks:{color:'#8b949e'}}}}});
-  } else { chart.data.labels=labels; chart.data.datasets[0].data=vals; chart.update(); }
-  // senales
+  if(!chart){
+    const ctx=$('curve').getContext('2d');
+    const g=ctx.createLinearGradient(0,0,0,180);
+    g.addColorStop(0,'rgba(212,175,55,.22)'); g.addColorStop(1,'rgba(212,175,55,0)');
+    chart=new Chart(ctx,{type:'line',
+      data:{labels,datasets:[{data:vals,borderColor:'#d4af37',borderWidth:1.8,
+        pointRadius:0,pointHitRadius:12,tension:.25,fill:true,backgroundColor:g}]},
+      options:{plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#12100c',borderColor:'#3d3320',borderWidth:1,
+        titleColor:'#9c917a',bodyColor:'#f3d878',displayColors:false,
+        bodyFont:{family:'IBM Plex Mono'},titleFont:{family:'IBM Plex Mono',size:10}}},
+      scales:{x:{grid:{color:'rgba(42,36,25,.5)'},ticks:{color:'#5f584a',maxTicksLimit:8,font:{family:'IBM Plex Mono',size:10}}},
+              y:{grid:{color:'rgba(42,36,25,.5)'},ticks:{color:'#5f584a',font:{family:'IBM Plex Mono',size:10}}}}}});
+  } else { chart.data.labels=labels; chart.data.datasets[0].data=vals; chart.update('none'); }
   let sh='<table><tr><th>Nivel</th><th>Fecha UTC</th><th>Dir</th><th>Entrada</th><th>Resultado</th><th>P&L est.</th></tr>';
   for(const s of d.signals) sh+=`<tr><td>${s.nivel}</td><td>${s.fecha}</td>
     <td>${s.dir}</td><td>${s.entry}</td><td>${s.resultado}</td><td>${s.pnl}</td></tr>`;
-  document.getElementById('signals').innerHTML = sh+'</table>';
-  // monitores
+  $('signals').innerHTML=sh+'</table>';
   let mh='<table><tr><th>Monitor</th><th>Última ejecución OK</th><th>Estado</th></tr>';
-  const mons = Object.entries(d.monitors);
-  if(!mons.length) mh += '<tr><td colspan=3 class="muted">sin registros hoy</td></tr>';
+  const mons=Object.entries(d.monitors);
+  if(!mons.length) mh+='<tr><td colspan=3 class="muted">sin registros hoy</td></tr>';
   for(const [k,v] of mons) mh+=`<tr><td>${k}</td><td>${v.last_end}</td>
     <td>${v.ok?'<span class="pos">OK</span>':'<span class="neg">ERROR</span>'}</td></tr>`;
-  document.getElementById('monitors').innerHTML = mh+'</table>';
+  $('monitors').innerHTML=mh+'</table>';
 }
-refresh(); setInterval(refresh, 30000);
+refresh(); setInterval(refresh,30000);
 </script></body></html>
 """
 
@@ -301,5 +409,5 @@ def index():
 
 
 if __name__ == '__main__':
-    print('Aurex Dashboard v1 (solo lectura) -> http://localhost:8181')
+    print('Aurex Dashboard v1.1 "Boveda" (solo lectura) -> http://localhost:8181')
     app.run(host='127.0.0.1', port=8181, debug=False)
