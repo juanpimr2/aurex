@@ -56,10 +56,12 @@ def sync_transactions(client, conn, from_date: datetime) -> int:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     while cursor_dt < now:
         end = min(cursor_dt + timedelta(days=CHUNK_DAYS), now)
-        txs = client.get_transaction_history(
-            from_date=cursor_dt.strftime('%Y-%m-%dT%H:%M:%S'),
-            to_date=end.strftime('%Y-%m-%dT%H:%M:%S'),
-        )
+        # OJO: la API devuelve 400 si 'to' es el momento actual/futuro.
+        # Para el ultimo tramo se omite 'to' (equivale a "hasta ahora").
+        kw = {'from_date': cursor_dt.strftime('%Y-%m-%dT%H:%M:%S')}
+        if end < now - timedelta(minutes=5):
+            kw['to_date'] = end.strftime('%Y-%m-%dT%H:%M:%S')
+        txs = client.get_transaction_history(**kw)
         for t in txs:
             ttype = t.get('transactionType', '')
             if ttype == 'SWAP':
