@@ -42,6 +42,11 @@ M15_PARAMS = {
 }
 EPIC          = 'GOLD'
 RISK_PCT      = 2.0
+# MODO_REAL=False desde 6-jul-2026 (aprobado por usuario): el nivel M15 pasa a
+# OBSERVACION tras 2TP/5SL reales (WR 29% vs 43% necesario, -27.91 acumulado).
+# Las senales se siguen registrando en paper para re-validar con velas propias
+# (collector) antes de reactivar dinero real.
+MODO_REAL     = False
 LOG_PATH      = os.path.join(os.path.dirname(__file__), 'm15_signal_log.csv')
 STATE_PATH    = os.path.join(os.path.dirname(__file__), 'm15_trade_state.json')
 COOLOFF_HOURS = 1.5
@@ -236,7 +241,7 @@ ema_align = "ALCISTA" if ema_bull else ("BAJISTA" if ema_bear else "MIXTA")
 
 # ── Print market state ────────────────────────────────────────────────────
 print("=" * 55)
-print("AUREX | MONITOR M15 | " + EPIC + " | REAL"
+print("AUREX | MONITOR M15 | " + EPIC + " | " + ("REAL" if MODO_REAL else "OBSERVACION")
       + ("  [CIERRE SEMANA]" if friday_close else ""))
 print("Hora UTC: " + now_utc.strftime('%H:%M') + " | Equity: $" + str(round(equity, 2)))
 print("=" * 55)
@@ -335,6 +340,20 @@ if NY_OPEN_START <= hora_utc < NY_OPEN_END:
     print("SENYAL M15: " + signal + " BLOQUEADA — ventana NY open (13:15-14:45 UTC)")
     print("=" * 55)
     sys.exit(0)
+
+# ── Filter: ventana de eventos macro de alto impacto (aprobado 6-jul-2026) ─
+# No abrir trades desde 4.5h antes hasta 2h despues de FOMC/NFP. La noticia
+# sigue sin ser trigger — esto solo IMPIDE entrar en la ventana de latigazos.
+try:
+    from macro_context import entry_block
+    _mblock, _mreason = entry_block(now_utc)
+    if _mblock:
+        print()
+        print("SENYAL M15: " + signal + " BLOQUEADA — evento macro: " + _mreason)
+        print("=" * 55)
+        sys.exit(0)
+except ImportError:
+    pass
 
 # ── Filter: dynamic ATR (must exceed SMA50 of ATR) ───────────────────────
 atr_val = float(prev['atr'])
@@ -444,6 +463,33 @@ print("  SMC H4 : " + smc_bias + (" " + smc_event if smc_event else "")
       + (" | FVG_OK"  if smc_fvg_conf else ""))
 
 # ── Open position ─────────────────────────────────────────────────────────
+if not MODO_REAL:
+    # OBSERVACION: registrar la senal en paper, SIN tocar el broker.
+    print()
+    print("MODO OBSERVACION — senal registrada en paper, NO se ejecuta dinero real.")
+    print("=" * 55)
+    _ts = now_utc.strftime('%Y-%m-%d %H:%M')
+    with open(LOG_PATH, 'a', newline='') as f:
+        csv.writer(f).writerow([
+            _ts, EPIC, signal,
+            round(entry, 2), sl, tp, rr,
+            round(size, 4), round(sl_dist * size, 2),
+            round(float(prev['rsi']), 1),
+            round(float(prev['atr']), 2),
+            ema_align,
+            'PENDIENTE', '', 'M15 OBSERVACION (paper desde 6-jul) | eq_ref=' + str(round(equity, 2))
+        ])
+    log_trade_open(
+        datetime_utc=_ts, epic=EPIC, source='M15_PAPER', direction=signal,
+        entry_price=round(entry, 2), sl=sl, tp=tp, rr=rr,
+        size=round(size, 4), riesgo_usd=round(sl_dist * size, 2),
+        rsi=round(float(prev['rsi']), 1), atr=round(float(prev['atr']), 2),
+        ema_align=ema_align, h1_trend=h1_trend, h4_trend=h4_trend,
+        deal_id=None, equity_before=round(equity, 2),
+        notas='M15 OBSERVACION',
+    )
+    sys.exit(0)
+
 print()
 print("Abriendo posicion...")
 deal_id    = None

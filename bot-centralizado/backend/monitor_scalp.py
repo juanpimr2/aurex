@@ -482,6 +482,19 @@ if friday_close:
     print("  -> No se abren trades hasta el lunes.")
     sys.exit(0)
 
+# ── Salvaguarda 0b: ventana de eventos macro alto impacto (aprobado 6-jul) ─
+# No abrir desde 4.5h antes hasta 2h despues de FOMC/NFP. La noticia sigue sin
+# ser trigger — este filtro solo impide entrar en la ventana de latigazos.
+try:
+    from macro_context import entry_block
+    _mblock, _mreason = entry_block()
+    if _mblock:
+        print("  BLOQUEADA: evento macro — " + _mreason)
+        print("  -> Sin entradas nuevas en la ventana del evento.")
+        sys.exit(0)
+except ImportError:
+    pass
+
 # ── Salvaguarda 1a: prioridad SWING — si hay posicion abierta, no operar ───
 gold_open = [p for p in positions if str(p.get('epic', '')).upper() == EPIC]
 if gold_open:

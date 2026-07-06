@@ -40,12 +40,44 @@ WINDOW_HIGH_H   = 6     # mismo bloque del evento -> cautela ALTA
 WINDOW_MED_H    = 24    # día previo -> cautela MEDIA
 
 
+def _us_holiday_or_observed(d: datetime) -> bool:
+    """Festivos federales USA de fecha fija (los que afectan al calendario BLS)
+    con su regla de observación: si cae sábado se observa el viernes previo,
+    si cae domingo se observa el lunes siguiente."""
+    fixed = [(1, 1), (6, 19), (7, 4), (12, 25)]  # Año Nuevo, Juneteenth, 4-jul, Navidad
+    for (m, day) in fixed:
+        h = datetime(d.year, m, day, tzinfo=timezone.utc)
+        observed = h
+        if h.weekday() == 5:      # sábado -> se observa viernes
+            observed = h - timedelta(days=1)
+        elif h.weekday() == 6:    # domingo -> se observa lunes
+            observed = h + timedelta(days=1)
+        if d.date() in (h.date(), observed.date()):
+            return True
+    return False
+
+
 def _first_friday(year: int, month: int) -> datetime:
-    """Primer viernes del mes — fecha aproximada del NFP (US Non-Farm Payrolls)."""
+    """Fecha del NFP (US Non-Farm Payrolls): primer viernes del mes, PERO si ese
+    viernes es festivo/observado en USA, el BLS lo adelanta al jueves previo.
+    (Bug corregido 6-jul-2026: el NFP de jun-2026 salió jueves 2-jul porque el
+    viernes 3-jul era la observación del 4 de julio.)"""
     d = datetime(year, month, 1, tzinfo=timezone.utc)
     # weekday(): lunes=0 ... viernes=4
     offset = (4 - d.weekday()) % 7
-    return d + timedelta(days=offset)
+    nfp = d + timedelta(days=offset)
+    if _us_holiday_or_observed(nfp):
+        # Regla BLS observada historicamente:
+        #  - Si el viernes ES el festivo (ej. 1-ene-2021) -> pospone a la semana sig.
+        #  - Si el viernes es solo la OBSERVACION (festivo en sabado, ej. 3-jul-2015
+        #    o 3-jul-2026) -> adelanta al jueves previo.
+        fixed = [(1, 1), (6, 19), (7, 4), (12, 25)]
+        es_festivo_exacto = (nfp.month, nfp.day) in fixed
+        if es_festivo_exacto:
+            nfp += timedelta(days=7)
+        else:
+            nfp -= timedelta(days=1)
+    return nfp
 
 
 def _upcoming_events(now: datetime, days_ahead: int = 10):
@@ -120,6 +152,34 @@ def macro_context(now: datetime = None, days_ahead: int = 45) -> dict:
                        + e["dt"].strftime("%d-%b %H:%M") + " UTC).")
 
     return {"caution": caution, "message": msg, "next": nxt, "upcoming": upcoming}
+
+
+def entry_block(now: datetime = None, pre_h: float = 4.5, post_h: float = 2.0) -> tuple:
+    """
+    Bloqueo de ENTRADAS alrededor de eventos de alto impacto (aprobado 6-jul-2026).
+
+    Devuelve (blocked: bool, reason: str). Si `now` está dentro de la ventana
+    [evento - pre_h, evento + post_h] de un FOMC/NFP -> (True, motivo).
+
+    Ventana asimétrica: 4.5h ANTES (un trade M15/H1 abierto ~2-4h antes sigue
+    vivo cuando llega el latigazo — el SL del 2-jul-2026 se abrió 4h antes del
+    NFP y murió en el vaivén pre-dato) y 2h DESPUÉS (dejar digerir la reacción,
+    que suele revertirse).
+
+    OJO: esto NO es operar por noticias — es un FILTRO que impide abrir trades
+    nuevos en la ventana de volatilidad. Las posiciones ya abiertas no se tocan:
+    su SL/TP en broker las protege.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    for e in _upcoming_events(now, days_ahead=3):
+        hours = (e["dt"] - now).total_seconds() / 3600.0
+        if -post_h <= hours <= pre_h:
+            when = ("en " + str(round(hours, 1)) + "h") if hours >= 0 \
+                   else ("hace " + str(round(-hours, 1)) + "h")
+            return True, (e["name"] + " " + when
+                          + " (ventana -" + str(pre_h) + "h/+" + str(post_h) + "h)")
+    return False, ""
 
 
 # ── Capa 2: Watchlist para revisión de noticias en vivo (Claude + WebSearch) ─
