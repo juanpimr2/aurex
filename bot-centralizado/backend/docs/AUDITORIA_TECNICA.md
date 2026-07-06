@@ -138,6 +138,8 @@
 | Fecha | Cambio | Respaldo | Aprobación |
 |-------|--------|----------|------------|
 | 01-jul-2026 | **SWING: TP `atr_tp_mult` 2.5 → 3.5×ATR** (R:R 1:1.25 → 1:1.75). SL (2.0×) y riesgo (5%) intactos. | Backtest R:R (`bt_rr_swing.py`, 27 meses): la franja de TP amplio supera al actual de forma robusta (PF 2.0→3.01). Walk-forward (`bt_wf_swing.py`, 4 tramos): la propuesta gana en 3/4 tramos y pierde menos en el peor; MaxDD idéntico (SL sin cambiar). | ✅ Usuario, 01-jul-2026 |
+| 06-jul-2026 | **M15 → MODO OBSERVACIÓN** (`MODO_REAL=False`). Señales siguen registrándose en paper. | Récord real: 2 TP / 5 SL, WR 29% vs 43% necesario (R:R 1:1.33), −27.91 acumulado. Patrón: stops de 1.5×ATR mueren en latigazos de madrugada/pre-evento con dirección correcta. Re-validación pendiente con velas propias del collector (~4-6 semanas de muestra). | ✅ Usuario, 06-jul-2026 |
+| 06-jul-2026 | **Bloqueo de entradas en ventana de eventos** (`macro_context.entry_block`, −4.5h/+2h de FOMC/NFP) en M15 y SCALP + **fix fecha NFP** (ajuste por festivos USA). | El SL del 2-jul se abrió 4h02m antes del NFP (que además el calendario tenía mal fechado por el festivo del 4-jul) y murió en el vaivén pre-dato. Ventana verificada contra casos históricos (jul-2015, ene-2021). Noticias siguen sin ser trigger: el filtro solo impide abrir. | ✅ Usuario, 06-jul-2026 |
 
 **Razón:** SWING captura tendencias largas del oro; el TP 2.5× cortaba las ganancias demasiado pronto. Ampliar solo el TP deja correr los trades sin añadir riesgo (SL fijo). Ampliar el SL se descartó por datos (empeora). Solo afecta a trades SWING **futuros**; no había posición abierta al aplicarlo.
 

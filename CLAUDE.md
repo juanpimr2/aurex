@@ -22,7 +22,7 @@ Directorio backend: `C:\Users\sagas\OneDrive\Escritorio\Documentos\BotMillonario
 |-------|---------|-----|-------------|----------|
 | 1 — SWING | monitor_swing.py | DAY + H4 | ✅ Real (activo desde Jun 2026) | Captura tendencias $30-150 |
 | 2 — SCALP | monitor_scalp.py | H1 + H4 | ✅ Real | Ganancias diarias $3-8 |
-| 3 — M15 | monitor_m15_obs.py | M15 | ✅ Real (activo desde Jun 2026) | Intraday $5-15 |
+| 3 — M15 | monitor_m15_obs.py | M15 | 👁️ OBSERVACIÓN (paper desde 6-jul-2026; 2TP/5SL reales, WR 29%, −27.91 — re-validar con velas propias antes de reactivar) | Intraday $5-15 |
 
 **Regla de coordinacion:** SWING tiene prioridad. Cuando SWING active modo real, SCALP queda bloqueado mientras haya posicion SWING abierta. Un trade a la vez.
 
