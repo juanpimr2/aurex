@@ -56,3 +56,12 @@ desktop.ini
 
 # Backups locales generados por backup_aurex.py
 backups/
+
+# Local AI Council runtime artifacts
+.ai/runtime/
+.ai/sessions/
+.ai-council.backup-before-global/
+
+# Local scratch/imported projects
+image.png
+leaveflow-jira/

@@ -16,20 +16,22 @@ Estrategia SWING (backtest DAY walk-forward, Nov2024-Jun2026, 24 trades):
 Confirmacion: H4 como filtro de entrada (mismo rol que H4 en SCALP H1)
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
 sys.path.insert(0, '.')
 
 import csv
 from datetime import datetime, timezone
 from capital_client import CapitalClient
-from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_position_size
+from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_safe_position_size, get_safe_size_candidates
 from smc_filters import smc_zones
 from macro_context import macro_context
+from runtime_config import real_trading_allowed
+from risk_config import get_risk_policy
 
 EPIC     = 'GOLD'
-RISK_PCT = 5.0
+RISK_POLICY = get_risk_policy('SWING')
+RISK_PCT = RISK_POLICY.risk_pct
 LOG_PATH = os.path.join(os.path.dirname(__file__), 'swing_signal_log.csv')
-MODO_REAL = True    # Activado 17 Apr 2026 — backtest walk-forward (WR 62.5%, PF 2.02, +15.3% en 19 meses)
+MODO_REAL, REAL_GUARD_REASON = real_trading_allowed('SWING')
 
 
 # ── Auto-cierre SWING: detectar posiciones PENDIENTE que cerraron en broker ─
@@ -324,7 +326,7 @@ else:
     tp = round(current_price - tp_dist, 2)
 
 rr   = round(tp_dist / sl_dist, 2) if sl_dist > 0 else 0
-size = get_position_size(equity, sl_dist, RISK_PCT)
+size = get_safe_position_size(equity, sl_dist, RISK_PCT)
 
 print("  Entry : $" + str(round(current_price, 2)))
 print("  SL    : $" + str(sl) + " (dist: " + str(round(sl_dist, 2)) + " pts — " + str(round(sl_dist/atr_day, 1)) + "x ATR)")
@@ -336,7 +338,7 @@ print("  H4    : " + h4_trend + " -> Confirmado")
 if not MODO_REAL:
     print()
     print("  [OBSERVACION] Senal registrada en swing_signal_log.csv")
-    print("  -> No se abre trade real. Activar MODO_REAL=True tras validacion.")
+    print("  -> No se abre trade real. " + REAL_GUARD_REASON)
     print()
     print("  PRIORIDAD SWING: Registrada. SCALP H1 puede operar en paralelo.")
 else:
@@ -344,7 +346,10 @@ else:
     print()
     print("Abriendo posicion SWING automaticamente...")
     deal_id = None
-    for attempt_size in [round(size, 2), 0.05, 0.01]:
+    size_candidates = get_safe_size_candidates(equity, sl_dist, RISK_PCT)
+    if not size_candidates:
+        print("BLOQUEADO: size seguro por debajo del minimo broker. No se abre trade.")
+    for attempt_size in size_candidates:
         deal_id = client.open_position(
             epic=EPIC, direction=signal, size=attempt_size,
             stop_loss=sl, take_profit=tp
@@ -355,8 +360,12 @@ else:
         print("  Size " + str(attempt_size) + " rechazado, probando menor...")
 
 # ── Registrar en log ───────────────────────────────────────────────────────
-notas = ("Observacion SWING - sin ejecucion real" if not MODO_REAL
-         else "Trade SWING real abierto | eq_open=" + str(round(equity, 2)))
+if not MODO_REAL:
+    notas = "Observacion SWING - sin ejecucion real | " + REAL_GUARD_REASON
+elif deal_id:
+    notas = "Trade SWING real abierto | eq_open=" + str(round(equity, 2))
+else:
+    notas = "BLOQUEADO SWING - sin ejecucion real | safe sizing/orden no aceptada"
 with open(LOG_PATH, 'a', newline='', encoding='utf-8') as f:
     writer = csv.writer(f)
     writer.writerow([

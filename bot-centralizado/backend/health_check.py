@@ -22,7 +22,7 @@ import sys
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 

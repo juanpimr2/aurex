@@ -4,7 +4,7 @@ Revision completa de sesion: 13-15 Abril 2026
 Que paso, que capturo la estrategia, que se perdio y por que.
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 from capital_client import CapitalClient

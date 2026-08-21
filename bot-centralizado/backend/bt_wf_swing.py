@@ -16,7 +16,7 @@ empeora). Riesgo 5% (produccion). Solo cambia el TP.
 Uso: python bt_wf_swing.py
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 from capital_client import CapitalClient

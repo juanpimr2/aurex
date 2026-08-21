@@ -12,7 +12,7 @@ Total: ~72 combinaciones. Mostramos solo las 10 mejores por puntuacion.
 Puntuacion = PF * WR * (ret/mes) / MaxDD  (mayor es mejor)
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 from capital_client import CapitalClient

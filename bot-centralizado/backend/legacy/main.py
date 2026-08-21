@@ -544,6 +544,14 @@ def start_trading(req: StartRequest) -> Dict[str, Any]:
     - Risk per trade is capped to `risk_pct`% of current equity (compounding).
     """
     global _trader
+    try:
+        from legacy.legacy_guard import legacy_block_reason, legacy_runtime_allowed
+    except Exception:
+        from legacy_guard import legacy_block_reason, legacy_runtime_allowed
+
+    if not legacy_runtime_allowed():
+        return {"error": legacy_block_reason("legacy/main.py /api/start")}
+
     if _trader and _trader.status["running"]:
         return {"error": "Bot is already running"}
 

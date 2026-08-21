@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
+try:
+    from legacy.legacy_guard import require_legacy_runtime
+except Exception:
+    from legacy_guard import require_legacy_runtime
 from capital_client import CapitalClient
 from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_position_size
+
+try:
+    require_legacy_runtime("legacy/open_trade.py")
+except RuntimeError as exc:
+    print("BLOQUEADO: " + str(exc))
+    sys.exit(2)
 
 client = CapitalClient()
 if not client.login():
