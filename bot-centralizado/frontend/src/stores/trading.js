@@ -25,8 +25,8 @@ export const useTradingStore = defineStore('trading', () => {
     const events = [
       {
         label: 'Council live watch',
-        status: 'running',
-        detail: 'Read-only broker supervision active',
+        status: 'warning',
+        detail: 'Not running by default; dashboard remains read-only',
       },
       {
         label: 'Broker mutations',

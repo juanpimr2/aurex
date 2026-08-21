@@ -362,10 +362,13 @@ else:
 # ── Registrar en log ───────────────────────────────────────────────────────
 if not MODO_REAL:
     notas = "Observacion SWING - sin ejecucion real | " + REAL_GUARD_REASON
+    resultado = "OBSERVACION"
 elif deal_id:
     notas = "Trade SWING real abierto | eq_open=" + str(round(equity, 2))
+    resultado = "PENDIENTE"
 else:
     notas = "BLOQUEADO SWING - sin ejecucion real | safe sizing/orden no aceptada"
+    resultado = "BLOQUEADO"
 with open(LOG_PATH, 'a', newline='', encoding='utf-8') as f:
     writer = csv.writer(f)
     writer.writerow([
@@ -375,7 +378,7 @@ with open(LOG_PATH, 'a', newline='', encoding='utf-8') as f:
         round(size, 4), round(sl_dist * size, 2),
         round(rsi_day, 1), round(atr_day, 2), day_trend,
         h4_trend, round(rsi_h4, 1),
-        'PENDIENTE', '', notas
+        resultado, '', notas
     ])
 
 print()

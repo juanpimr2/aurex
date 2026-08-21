@@ -150,8 +150,8 @@ const gates = computed(() => [
   },
   {
     name: 'Live watch',
-    status: 'running',
-    detail: 'Council supervision is read-only and does not open, close, or modify trades.',
+    status: 'warning',
+    detail: 'Optional supervisor is not assumed active. This UI remains read-only.',
   },
 ])
 
