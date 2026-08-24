@@ -28,6 +28,7 @@ def test_runtime_status_endpoint_uses_read_only_contract(monkeypatch):
             "broker_ok": True,
             "balance": {"balance": 500, "available": 500, "profit_loss": 0},
             "positions": [],
+            "reconciliation": {"status": "ok", "ready_for_real_trading": False},
             "monitors": {"monitor_swing": {"last_end": None, "ok": None}},
             "estado": "OPERATIVO",
         }
@@ -42,3 +43,4 @@ def test_runtime_status_endpoint_uses_read_only_contract(monkeypatch):
     assert data["verdict"] == "NO_GO_FOR_REAL_TRADING"
     assert data["broker"]["read_only"] is True
     assert data["account"]["positions_count"] == 0
+    assert data["reconciliation"]["status"] == "ok"
