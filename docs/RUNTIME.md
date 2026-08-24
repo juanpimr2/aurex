@@ -75,3 +75,30 @@ The Vue dashboard is read-only. It may display:
 
 It must not provide buttons that open, close, modify, start, or stop live
 trading.
+
+## Runtime Status Contract
+
+Canonical read-only runtime endpoint:
+
+```text
+GET /api/runtime/status
+```
+
+The endpoint reports:
+
+- schema version
+- broker mode and read-only status
+- real-trading verdict
+- account and positions snapshot, when available
+- runtime gates
+- monitor health
+- stable errors
+
+It must not call:
+
+- `open_position`
+- `modify_position`
+- `close_position`
+
+The endpoint may report that broker mutation gates are enabled in the local
+environment, but the dashboard mutation surface itself must remain disabled.

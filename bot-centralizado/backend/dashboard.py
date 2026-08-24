@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, render_template_string
 from capital_client import CapitalClient
+from runtime_status import build_runtime_status
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE, 'aurex_trades.db')
@@ -170,6 +171,18 @@ def build_status():
 @app.route('/api/status')
 def api_status():
     return jsonify(build_status())
+
+
+@app.route('/api/runtime/status')
+def api_runtime_status():
+    status = build_status()
+    return jsonify(build_runtime_status(
+        broker_ok=status.get('broker_ok'),
+        balance=status.get('balance'),
+        positions=status.get('positions'),
+        monitors=status.get('monitors'),
+        errors=[] if status.get('broker_ok') else [status.get('estado', 'broker unavailable')],
+    ))
 
 
 PAGE = r"""
