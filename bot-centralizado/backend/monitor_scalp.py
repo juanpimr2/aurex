@@ -19,18 +19,21 @@ Funciones automaticas:
   - Trailing stop: mueve SL a breakeven cuando posicion alcanza 50%+ del TP
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
 sys.path.insert(0, '.')
 
 import csv
 from datetime import datetime, timezone
 from capital_client import CapitalClient
-from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_position_size
+from strategy import StrategyConfig, STRATEGY_PRESETS, calculate_indicators, generate_signals, get_safe_position_size, get_safe_size_candidates
+from runtime_config import real_trading_allowed
+from risk_config import get_risk_policy
 
-RISK_PCT        = 2.0    # % del equity por trade
-MAX_RISK_OPEN   = 5.0    # % maximo del equity en riesgo simultaneo
-MAX_DD_PCT      = 10.0   # % max drawdown abierto antes de pausar
-MAX_DD_DAY_PCT  = 5.0    # % max perdida diaria antes de parar
+RISK_POLICY     = get_risk_policy('SCALP')
+RISK_PCT        = RISK_POLICY.risk_pct
+MAX_RISK_OPEN   = RISK_POLICY.max_risk_open_pct
+MAX_DD_PCT      = RISK_POLICY.max_dd_pct
+MAX_DD_DAY_PCT  = RISK_POLICY.max_dd_day_pct
+MODO_REAL, REAL_GUARD_REASON = real_trading_allowed('SCALP')
 EPIC            = 'GOLD'
 LOG_PATH        = os.path.join(os.path.dirname(__file__), 'trade_log.csv')
 SWING_LOG_PATH  = os.path.join(os.path.dirname(__file__), 'swing_signal_log.csv')
@@ -309,6 +312,10 @@ def apply_trailing_stop(client, positions):
     Para cada posicion con P&L >= 50% del camino al TP,
     mueve el SL al precio de entrada (breakeven).
     """
+    if not MODO_REAL:
+        print("  [TRAILING STOP] Bloqueado: " + REAL_GUARD_REASON)
+        return
+
     for p in positions:
         entry   = p.get('entry_price') or 0
         sl      = p.get('stop_loss')   or 0
@@ -590,7 +597,7 @@ else:
     sl = round(current_price + sl_dist, 2)
     tp = round(current_price - tp_dist, 2)
 
-size = get_position_size(equity, sl_dist, RISK_PCT)
+size = get_safe_position_size(equity, sl_dist, RISK_PCT)
 
 print("  Entry : " + str(current_price))
 print("  SL    : " + str(sl) + " (dist: " + str(round(sl_dist, 2)) + " pts)")
@@ -599,12 +606,22 @@ print("  R:R   : 1:" + str(round(tp_dist / sl_dist, 2)))
 print("  Size  : " + str(round(size, 4)) + " | Riesgo: $" + str(round(sl_dist * size, 2)))
 print("  H4    : " + h4_trend + " -> OK")
 
+if not MODO_REAL:
+    print()
+    print("BLOQUEADO SCALP REAL: " + REAL_GUARD_REASON)
+    print("No se abre trade real.")
+    sys.exit(0)
+
 # ── Abrir posicion ─────────────────────────────────────────────────────────
 print()
 print("Abriendo posicion automaticamente...")
 deal_id      = None
 final_size   = None
-for attempt_size in [round(size, 2), 0.05, 0.01]:
+size_candidates = get_safe_size_candidates(equity, sl_dist, RISK_PCT)
+if not size_candidates:
+    print("BLOQUEADO: size seguro por debajo del minimo broker. No se abre trade.")
+
+for attempt_size in size_candidates:
     deal_id = client.open_position(
         epic=EPIC, direction=signal, size=attempt_size,
         stop_loss=sl, take_profit=tp

@@ -12,6 +12,10 @@ from typing import List, Dict, Optional, Callable
 
 from capital_client import CapitalClient
 from strategy import StrategyConfig, get_latest_signal, get_position_size
+try:
+    from legacy.legacy_guard import legacy_block_reason, legacy_runtime_allowed
+except Exception:
+    from legacy_guard import legacy_block_reason, legacy_runtime_allowed
 
 logger = logging.getLogger("trader")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -57,6 +61,10 @@ class LiveTrader:
 
     def start(self) -> bool:
         with self._lock:
+            if not legacy_runtime_allowed():
+                self.status["error"] = legacy_block_reason("legacy/trader.py")
+                logger.error(self.status["error"])
+                return False
             if self._running:
                 return False
             if not self.client.login():

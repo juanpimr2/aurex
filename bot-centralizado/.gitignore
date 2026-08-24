@@ -18,6 +18,8 @@ build/
 backend/logs/
 backend/backtest_results/
 *.json
+!frontend/package.json
+!frontend/package-lock.json
 *.log
 
 # Node / Frontend

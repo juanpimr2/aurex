@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from strategy import (
     StrategyConfig, STRATEGY_PRESETS, get_position_size,
+    get_safe_position_size, get_safe_size_candidates,
     calculate_indicators, generate_signals, get_latest_signal,
 )
 
@@ -47,6 +48,30 @@ def test_sizing_respeta_minimo_capital_com():
 
 
 # ── Presets (proteccion contra cambios accidentales) ───────────────────────
+
+def test_safe_sizing_no_sube_al_minimo_si_excede_riesgo():
+    assert get_safe_position_size(100.0, 10000.0, 1.0) == 0.0
+    assert get_safe_size_candidates(100.0, 10000.0, 1.0) == []
+
+
+def test_safe_sizing_redondea_hacia_abajo():
+    equity = 500.0
+    sl = 61.0
+    pct = 1.0
+    size = get_safe_position_size(equity, sl, pct)
+    assert size == 0.08
+    assert size * sl <= equity * pct / 100
+
+
+def test_safe_size_candidates_son_monotonicamente_seguros():
+    equity = 500.0
+    sl = 20.0
+    pct = 1.0
+    raw_size = (equity * pct / 100) / sl
+    candidates = get_safe_size_candidates(equity, sl, pct)
+    assert candidates
+    assert all(candidate <= raw_size for candidate in candidates)
+
 
 def test_preset_swing_es_el_aprobado():
     """El preset SWING en produccion es el aprobado el 1-jul-2026:

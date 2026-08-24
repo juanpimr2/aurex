@@ -9,7 +9,7 @@ amplias, con datos DAY reales de Capital.com y spread realista.
 Uso: python bt_rr_swing.py
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 from capital_client import CapitalClient

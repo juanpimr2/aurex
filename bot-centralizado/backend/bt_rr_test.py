@@ -4,7 +4,7 @@ Test de diferentes configuraciones SL/TP para SCALP H1
 Objetivo: encontrar el mejor R:R con expectancy positiva
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 from capital_client import CapitalClient

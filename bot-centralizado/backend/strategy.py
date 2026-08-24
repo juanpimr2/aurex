@@ -18,6 +18,7 @@ Parámetros por defecto (SWING):
   Vol mult:     1.0 (volumen > media de 50)
   Risk:         1.5% por operación
 """
+import math
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
@@ -220,6 +221,56 @@ def get_position_size(
     risk_amount = equity * (risk_pct / 100.0)
     size = risk_amount / sl_distance
     return max(size, min_size)
+
+
+def get_safe_position_size(
+    equity: float,
+    sl_distance: float,
+    risk_pct: float,
+    min_size: float = 0.01,
+    precision: int = 2,
+) -> float:
+    """
+    Return the largest broker-rounded size that does not exceed calculated risk.
+
+    Unlike get_position_size, this function never floors upward to broker
+    minimum if the minimum would exceed the risk budget. It returns 0.0 instead.
+    """
+    if sl_distance <= 0 or equity <= 0 or risk_pct <= 0:
+        return 0.0
+    risk_amount = equity * (risk_pct / 100.0)
+    raw_size = risk_amount / sl_distance
+    factor = 10 ** precision
+    safe_size = math.floor(raw_size * factor) / factor
+    if safe_size < min_size:
+        return 0.0
+    return round(safe_size, precision)
+
+
+def get_safe_size_candidates(
+    equity: float,
+    sl_distance: float,
+    risk_pct: float,
+    min_size: float = 0.01,
+    precision: int = 2,
+) -> list:
+    """
+    Candidate order sizes, monotonically safe.
+
+    Every returned candidate is <= the raw risk-calculated size. If broker
+    minimum exceeds risk budget, returns an empty list and the trade must block.
+    """
+    if sl_distance <= 0 or equity <= 0 or risk_pct <= 0:
+        return []
+    risk_amount = equity * (risk_pct / 100.0)
+    raw_size = risk_amount / sl_distance
+    primary = get_safe_position_size(equity, sl_distance, risk_pct, min_size, precision)
+    candidates = []
+    for candidate in (primary, 0.05, 0.01):
+        candidate = round(candidate, precision)
+        if candidate >= min_size and candidate <= raw_size + 1e-12 and candidate not in candidates:
+            candidates.append(candidate)
+    return candidates
 
 
 def calculate_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> pd.DataFrame:

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Monitor M15 - MODO REAL
-========================
-Executes real trades on Capital.com using the M15+H4 strategy.
+Monitor M15 - MODO OBSERVACION
+==============================
+Observes the M15+H4 strategy and records paper signals.
 
 Parameters : EMA 3/8/21 | RSI 14 (30-70) | SL 1.5xATR / TP 2.0xATR
 Session    : 01:00-22:00 UTC (Asia + London + NY)
@@ -16,7 +16,6 @@ Logs: m15_signal_log.csv + SQLite aurex_trades.db
 """
 import os
 import sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
 sys.path.insert(0, '.')
 
 import csv
@@ -24,8 +23,10 @@ import json
 from datetime import datetime, timezone
 
 from capital_client import CapitalClient
-from strategy import StrategyConfig, calculate_indicators, generate_signals, get_position_size, calculate_supertrend
+from strategy import StrategyConfig, calculate_indicators, generate_signals, get_safe_position_size, get_safe_size_candidates, calculate_supertrend
 from db import log_trade_open, init_db
+from runtime_config import real_trading_allowed
+from risk_config import get_risk_policy
 
 init_db()
 
@@ -41,11 +42,13 @@ M15_PARAMS = {
     "recommended_timeframe": "MINUTE_15",
 }
 EPIC          = 'GOLD'
-RISK_PCT      = 2.0
+RISK_POLICY   = get_risk_policy('M15')
+RISK_PCT      = RISK_POLICY.risk_pct
 # MODO_REAL=False desde 6-jul-2026 (aprobado por usuario): el nivel M15 pasa a
 # OBSERVACION tras 2TP/5SL reales (WR 29% vs 43% necesario, -27.91 acumulado).
 # Las senales se siguen registrando en paper para re-validar con velas propias
 # (collector) antes de reactivar dinero real.
+MODO_REAL_ALLOWED, REAL_GUARD_REASON = real_trading_allowed('M15')
 MODO_REAL     = False
 LOG_PATH      = os.path.join(os.path.dirname(__file__), 'm15_signal_log.csv')
 STATE_PATH    = os.path.join(os.path.dirname(__file__), 'm15_trade_state.json')
@@ -282,7 +285,7 @@ if gold_pos:
     print("  PnL: $" + str(round(pnl_p, 2)) + " | % hacia TP: " + str(round(pct_tp, 1)) + "%")
 
     # Move SL to breakeven when 50%+ toward TP
-    if pct_tp >= 50 and deal_p:
+    if pct_tp >= 50 and deal_p and MODO_REAL:
         breakeven = round(entry_p, 2)
         already_safe = (
             (direc_p == 'BUY'  and sl_p >= breakeven) or
@@ -300,6 +303,8 @@ if gold_pos:
                   + " | " + ("OK" if ok else "ERROR"))
         else:
             print("  [TRAILING] Ya en breakeven o mejor")
+    elif pct_tp >= 50 and deal_p:
+        print("  [TRAILING] Bloqueado en observacion: " + REAL_GUARD_REASON)
 
     print()
     print("SENYAL M15: Posicion abierta — sin nueva entrada")
@@ -438,7 +443,7 @@ else:
     tp = round(entry - tp_dist, 2)
 
 rr   = round(tp_dist / sl_dist, 2) if sl_dist > 0 else 0
-size = get_position_size(equity, sl_dist, RISK_PCT)
+size = get_safe_position_size(equity, sl_dist, RISK_PCT)
 
 # ── SMC: confluence check with entry and signal ───────────────────────────
 smc_ob_warn  = False
@@ -494,7 +499,11 @@ print()
 print("Abriendo posicion...")
 deal_id    = None
 final_size = None
-for attempt_size in [round(size, 2), 0.05, 0.01]:
+size_candidates = get_safe_size_candidates(equity, sl_dist, RISK_PCT)
+if not size_candidates:
+    print("BLOQUEADO: size seguro por debajo del minimo broker. No se abre trade.")
+
+for attempt_size in size_candidates:
     deal_id = client.open_position(
         epic=EPIC, direction=signal, size=attempt_size,
         stop_loss=sl, take_profit=tp

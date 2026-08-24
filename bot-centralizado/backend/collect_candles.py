@@ -17,7 +17,7 @@ import sys
 import sqlite3
 from datetime import datetime, timezone
 
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from capital_client import CapitalClient

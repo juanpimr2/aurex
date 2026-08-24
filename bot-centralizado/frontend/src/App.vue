@@ -1,44 +1,33 @@
 <template>
   <div id="layout">
-    <!-- Sidebar -->
     <nav class="sidebar">
       <div class="logo">
-        <span class="logo-icon">🤖</span>
-        <span class="logo-text">BotMillonario</span>
+        <span class="logo-mark">AX</span>
+        <div>
+          <span class="logo-text">Aurex</span>
+          <span class="logo-subtitle">Operations</span>
+        </div>
       </div>
 
       <div class="nav-links">
-        <router-link to="/" class="nav-link" active-class="active">
-          <span>📊</span> Dashboard
-        </router-link>
-        <router-link to="/backtest" class="nav-link" active-class="active">
-          <span>🔬</span> Backtest
-        </router-link>
-        <router-link to="/settings" class="nav-link" active-class="active">
-          <span>⚙️</span> Configuración
-        </router-link>
+        <router-link to="/" class="nav-link" active-class="active">Dashboard</router-link>
+        <router-link to="/backtest" class="nav-link" active-class="active">Backtest</router-link>
+        <router-link to="/settings" class="nav-link" active-class="active">Settings</router-link>
       </div>
 
-      <!-- Status indicators -->
       <div class="sidebar-footer">
         <div class="status-row">
-          <span class="dot" :class="store.wsConnected ? 'dot-green' : 'dot-red'"></span>
-          <span class="text-muted" style="font-size:12px">
-            {{ store.wsConnected ? 'Conectado' : 'Sin conexión' }}
-          </span>
+          <span class="dot" :class="store.wsConnected ? 'dot-green' : 'dot-gray'"></span>
+          <span>{{ store.wsConnected ? 'API connected' : 'API offline' }}</span>
         </div>
-        <div class="status-row" style="margin-top:0.5rem">
-          <span class="dot" :class="store.botRunning ? 'dot-green blink' : 'dot-gray'"></span>
-          <span class="text-muted" style="font-size:12px">
-            Bot {{ store.botRunning ? 'activo' : 'inactivo' }}
-          </span>
+        <div class="status-row">
+          <span class="dot dot-yellow"></span>
+          <span>Read-only mode</span>
         </div>
       </div>
     </nav>
 
-    <!-- Main content -->
     <main class="main">
-      <!-- Notifications -->
       <div class="notifications">
         <transition-group name="notif">
           <div
@@ -60,12 +49,11 @@ import { onMounted } from 'vue'
 import { useTradingStore } from './stores/trading.js'
 
 const store = useTradingStore()
+
 onMounted(() => {
   store.connectWS()
-  store.fetchBalance()
-  store.fetchStatus()
-  // Refresh cada 30 segundos
-  setInterval(() => { store.fetchBalance(); store.fetchPositions() }, 30_000)
+  store.refreshReadOnly()
+  setInterval(store.refreshReadOnly, 30_000)
 })
 </script>
 
@@ -75,11 +63,10 @@ onMounted(() => {
   min-height: 100vh;
 }
 
-/* Sidebar */
 .sidebar {
-  width: 200px;
-  min-width: 200px;
-  background: var(--bg2);
+  width: 220px;
+  min-width: 220px;
+  background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -92,46 +79,92 @@ onMounted(() => {
 .logo {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0 1.5rem;
-  font-weight: 700;
-  font-size: 15px;
+  gap: 0.75rem;
+  padding: 0.5rem 0 1.25rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
 }
 
-.logo-icon { font-size: 1.4rem; }
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #07110d;
+  font-weight: 800;
+  font-size: 13px;
+}
 
-.nav-links { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.logo-text,
+.logo-subtitle {
+  display: block;
+}
+
+.logo-text {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.logo-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
 
 .nav-link {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   border-radius: var(--radius);
-  color: var(--text2);
+  color: var(--muted);
   font-size: 14px;
   transition: all 0.15s;
 }
-.nav-link:hover { background: var(--bg3); color: var(--text); }
-.nav-link.active { background: rgba(88,166,255,0.15); color: var(--blue); }
 
-.sidebar-footer { margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); }
+.nav-link:hover {
+  background: var(--surface-strong);
+  color: var(--text);
+}
 
-.status-row { display: flex; align-items: center; gap: 0.5rem; }
+.nav-link.active {
+  background: rgba(72, 187, 120, 0.12);
+  color: var(--accent);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--text2);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
 }
-.dot-green { background: var(--green); }
-.dot-red   { background: var(--red); }
-.dot-gray  { background: var(--text2); }
-.blink { animation: blink 1.5s infinite; }
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* Main */
+.dot-green { background: var(--accent); }
+.dot-yellow { background: var(--warning); }
+.dot-gray { background: var(--muted); }
+
 .main {
   flex: 1;
   overflow-y: auto;
@@ -139,7 +172,6 @@ onMounted(() => {
   position: relative;
 }
 
-/* Notifications */
 .notifications {
   position: fixed;
   top: 1rem;
@@ -158,13 +190,38 @@ onMounted(() => {
   font-weight: 500;
   border: 1px solid;
 }
-.notif-green  { background: rgba(63,185,80,0.15);  border-color: var(--green); color: var(--green); }
-.notif-red    { background: rgba(248,81,73,0.15);   border-color: var(--red);   color: var(--red); }
-.notif-yellow { background: rgba(210,153,34,0.15);  border-color: var(--yellow);color: var(--yellow); }
-.notif-blue   { background: rgba(88,166,255,0.15);  border-color: var(--blue);  color: var(--blue); }
 
-/* Transition */
-.notif-enter-active, .notif-leave-active { transition: all 0.3s; }
-.notif-enter-from { opacity: 0; transform: translateX(20px); }
-.notif-leave-to   { opacity: 0; transform: translateX(20px); }
+.notif-green { background: rgba(72,187,120,0.15); border-color: var(--accent); color: var(--accent); }
+.notif-red { background: rgba(248,81,73,0.15); border-color: var(--danger); color: var(--danger); }
+.notif-yellow { background: rgba(245,158,11,0.15); border-color: var(--warning); color: var(--warning); }
+.notif-blue { background: rgba(56,189,248,0.15); border-color: var(--info); color: var(--info); }
+
+.notif-enter-active,
+.notif-leave-active {
+  transition: all 0.3s;
+}
+
+.notif-enter-from,
+.notif-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+@media (max-width: 760px) {
+  #layout {
+    display: block;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    position: static;
+  }
+
+  .nav-links {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+}
 </style>

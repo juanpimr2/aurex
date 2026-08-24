@@ -1,237 +1,367 @@
 <template>
-  <div>
-    <div class="page-header">
+  <div class="dashboard">
+    <header class="page-header">
       <div>
-        <h1>Dashboard</h1>
-        <p class="text-muted">Estado en tiempo real de tu bot</p>
+        <h1>Aurex Operations Dashboard</h1>
+        <p class="text-muted">Read-only supervision for broker state, runtime safety, and strategy readiness.</p>
       </div>
-      <div class="header-actions">
-        <button v-if="!store.botRunning" class="btn btn-green" @click="handleStart" :disabled="starting">
-          <span v-if="starting" class="spinner"></span>
-          <span v-else>▶</span>
-          Iniciar Bot
-        </button>
-        <button v-else class="btn btn-red" @click="handleStop">
-          ■ Detener Bot
-        </button>
+      <div class="verdict" :class="store.councilVerdict === 'NO_GO_FOR_REAL_TRADING' ? 'verdict-danger' : 'verdict-warning'">
+        <span class="verdict-label">Council verdict</span>
+        <strong>{{ formatVerdict(store.councilVerdict) }}</strong>
       </div>
-    </div>
+    </header>
 
-    <!-- Balance cards -->
-    <div class="grid-4" style="margin-bottom:1rem">
-      <div class="card">
-        <div class="card-label">Balance</div>
-        <div class="card-value mono">
-          {{ store.balance ? `€${store.balance.balance?.toFixed(2)}` : '—' }}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-label">Disponible</div>
-        <div class="card-value mono">
-          {{ store.balance ? `€${store.balance.available?.toFixed(2)}` : '—' }}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-label">P&L Abierto</div>
-        <div class="card-value mono" :class="store.totalPnL >= 0 ? 'text-green' : 'text-red'">
-          {{ store.totalPnL >= 0 ? '+' : '' }}€{{ store.totalPnL.toFixed(2) }}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-label">Posiciones</div>
-        <div class="card-value mono">{{ store.positions.length }}</div>
-      </div>
-    </div>
+    <section class="metrics-grid">
+      <article class="metric-card">
+        <span>Balance</span>
+        <strong>{{ money(store.balance?.balance) }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Available</span>
+        <strong>{{ money(store.balance?.available) }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Open P&amp;L</span>
+        <strong :class="store.totalPnL >= 0 ? 'text-green' : 'text-red'">{{ signedMoney(store.totalPnL) }}</strong>
+      </article>
+      <article class="metric-card">
+        <span>Positions</span>
+        <strong>{{ store.positions.length }}</strong>
+      </article>
+    </section>
 
-    <!-- Bot config quick view -->
-    <div class="card" style="margin-bottom:1rem">
-      <div class="section-title">Configuración activa</div>
-      <div class="config-row">
-        <div class="form-group">
-          <label>Activo</label>
-          <select v-model="botConfig.epic">
-            <option value="GOLD">GOLD (XAU/USD)</option>
-            <option value="US30">US30 (Dow Jones)</option>
-            <option value="US500">US500 (S&P 500)</option>
-            <option value="US100">US100 (NASDAQ)</option>
-          </select>
+    <section class="panel-grid">
+      <article class="panel panel-wide">
+        <div class="panel-header">
+          <h2>Runtime Gates</h2>
+          <span class="badge badge-yellow">read-only</span>
         </div>
-        <div class="form-group">
-          <label>Timeframe</label>
-          <select v-model="botConfig.timeframe">
-            <option value="MINUTE_15">15 min (Intraday)</option>
-            <option value="MINUTE_30">30 min (Intraday)</option>
-            <option value="HOUR">1H (Intraday)</option>
-            <option value="HOUR_4">4H (Swing)</option>
-            <option value="DAY">1D (Swing)</option>
-          </select>
+        <div class="gate-grid">
+          <div v-for="gate in gates" :key="gate.name" class="gate-row">
+            <span class="gate-dot" :class="`gate-${gate.status}`"></span>
+            <div>
+              <strong>{{ gate.name }}</strong>
+              <p>{{ gate.detail }}</p>
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Riesgo por trade (%)</label>
-          <input v-model.number="botConfig.risk_pct" type="number" step="0.1" min="0.5" max="5" />
-        </div>
-        <div class="form-group">
-          <label>Intervalo check (seg)</label>
-          <input v-model.number="botConfig.check_interval" type="number" step="300" min="300" />
-        </div>
-      </div>
-      <div class="config-row" style="margin-top:0.75rem">
-        <div class="form-group">
-          <label>EMA Rápida</label>
-          <input v-model.number="botConfig.ema_fast" type="number" />
-        </div>
-        <div class="form-group">
-          <label>EMA Lenta</label>
-          <input v-model.number="botConfig.ema_slow" type="number" />
-        </div>
-        <div class="form-group">
-          <label>EMA Larga</label>
-          <input v-model.number="botConfig.ema_long" type="number" />
-        </div>
-        <div class="form-group">
-          <label>ATR SL mult</label>
-          <input v-model.number="botConfig.atr_sl_mult" type="number" step="0.1" />
-        </div>
-        <div class="form-group">
-          <label>ATR TP mult</label>
-          <input v-model.number="botConfig.atr_tp_mult" type="number" step="0.1" />
-        </div>
-      </div>
-    </div>
+      </article>
 
-    <!-- Posiciones abiertas -->
-    <div class="grid-2" style="margin-bottom:1rem">
-      <div class="card">
-        <div class="section-title">Posiciones abiertas</div>
-        <div v-if="!store.positions.length" class="text-muted" style="padding:1rem 0">
-          Sin posiciones abiertas
+      <article class="panel">
+        <div class="panel-header">
+          <h2>API State</h2>
+          <span class="badge" :class="store.wsConnected ? 'badge-green' : 'badge-gray'">
+            {{ store.wsConnected ? 'connected' : 'offline' }}
+          </span>
         </div>
-        <div v-for="p in store.positions" :key="p.deal_id" class="position-card">
-          <div class="position-header">
-            <span class="mono">{{ p.epic }}</span>
-            <span class="badge" :class="p.direction === 'BUY' ? 'badge-green' : 'badge-red'">
-              {{ p.direction }}
-            </span>
+        <dl class="kv-list">
+          <div>
+            <dt>Last refresh</dt>
+            <dd>{{ formatDate(store.lastRefresh) }}</dd>
           </div>
-          <div class="position-row">
-            <span class="text-muted">Entrada</span>
-            <span class="mono">{{ p.entry_price }}</span>
+          <div>
+            <dt>Last price</dt>
+            <dd>{{ store.livePrice?.price ? Number(store.livePrice.price).toFixed(2) : '-' }}</dd>
           </div>
-          <div class="position-row">
-            <span class="text-muted">SL / TP</span>
-            <span class="mono text-red">{{ p.stop_loss }}</span>
-            <span class="mono text-muted"> / </span>
-            <span class="mono text-green">{{ p.take_profit }}</span>
+          <div>
+            <dt>Last error</dt>
+            <dd>{{ store.lastError || '-' }}</dd>
           </div>
-          <div class="position-row">
-            <span class="text-muted">P&L</span>
-            <span class="mono" :class="(p.profit_loss || 0) >= 0 ? 'text-green' : 'text-red'">
-              {{ (p.profit_loss || 0) >= 0 ? '+' : '' }}€{{ (p.profit_loss || 0).toFixed(2) }}
+        </dl>
+      </article>
+    </section>
+
+    <section class="panel-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Strategy Councils</h2>
+        </div>
+        <div class="strategy-list">
+          <div v-for="strategy in strategies" :key="strategy.name" class="strategy-row">
+            <div>
+              <strong>{{ strategy.name }}</strong>
+              <p>{{ strategy.description }}</p>
+            </div>
+            <span class="badge" :class="strategy.badgeClass">{{ strategy.mode }}</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Positions</h2>
+          <span class="badge badge-gray">{{ store.positions.length }}</span>
+        </div>
+        <div v-if="!store.positions.length" class="empty-state">
+          No open positions detected.
+        </div>
+        <div v-else class="position-list">
+          <div v-for="p in store.positions" :key="p.deal_id" class="position-row">
+            <div>
+              <strong>{{ p.epic }}</strong>
+              <p>{{ p.direction }} x{{ p.size }}</p>
+            </div>
+            <span :class="(p.profit_loss || 0) >= 0 ? 'text-green' : 'text-red'">
+              {{ signedMoney(p.profit_loss || 0) }}
             </span>
           </div>
         </div>
-      </div>
+      </article>
+    </section>
 
-      <!-- Log de eventos -->
-      <div class="card">
-        <div class="section-title">Últimas operaciones del bot</div>
-        <div v-if="!store.tradeLog.length" class="text-muted" style="padding:1rem 0">
-          El bot no ha ejecutado operaciones aún
-        </div>
-        <div v-for="t in store.tradeLog.slice(0, 8)" :key="t.deal_id || t.timestamp" class="log-entry">
-          <span class="badge" :class="t.direction === 'BUY' ? 'badge-green' : 'badge-red'" style="font-size:10px">
-            {{ t.direction }}
-          </span>
-          <span class="mono">{{ t.epic }}</span>
-          <span class="text-muted mono">@ {{ Number(t.entry_price).toFixed(2) }}</span>
-          <span class="text-muted" style="font-size:11px; margin-left:auto">
-            {{ t.timestamp ? new Date(t.timestamp).toLocaleTimeString('es') : '' }}
-          </span>
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Council Timeline</h2>
+      </div>
+      <div class="timeline">
+        <div v-for="event in store.runtimeEvents" :key="event.label" class="timeline-row">
+          <span class="gate-dot" :class="`gate-${event.status}`"></span>
+          <div>
+            <strong>{{ event.label }}</strong>
+            <p>{{ event.detail }}</p>
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Live price -->
-    <div v-if="store.livePrice" class="card">
-      <div class="section-title">Precio en tiempo real</div>
-      <div style="display:flex; gap:2rem; flex-wrap:wrap; padding-top:0.5rem">
-        <div>
-          <div class="card-label">Activo</div>
-          <div class="card-value mono">{{ store.livePrice.epic }}</div>
-        </div>
-        <div>
-          <div class="card-label">Precio</div>
-          <div class="card-value mono">{{ Number(store.livePrice.price).toFixed(2) }}</div>
-        </div>
-        <div>
-          <div class="card-label">Última revisión</div>
-          <div class="card-value mono text-muted" style="font-size:13px">{{ store.livePrice.timestamp }}</div>
-        </div>
-      </div>
-    </div>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useTradingStore } from '../stores/trading.js'
 
 const store = useTradingStore()
-const starting = ref(false)
 
-const botConfig = ref({
-  epic: 'GOLD',
-  timeframe: 'DAY',
-  risk_pct: 1.5,
-  max_positions: 2,
-  check_interval: 3600,
-  ema_fast: 8,
-  ema_slow: 21,
-  ema_long: 50,
-  atr_sl_mult: 1.0,
-  atr_tp_mult: 2.5,
-})
+const gates = computed(() => [
+  {
+    name: 'REAL broker mutation',
+    status: 'blocked',
+    detail: 'Requires CAPITAL_MODE=REAL, AUREX_ALLOW_REAL=YES, and AUREX_ALLOW_BROKER_MUTATION=YES.',
+  },
+  {
+    name: 'Legacy runtime',
+    status: 'blocked',
+    detail: 'legacy/main.py, legacy/trader.py, and legacy/open_trade.py are disabled by default.',
+  },
+  {
+    name: 'Safe sizing',
+    status: 'running',
+    detail: 'Broker minimum is not used if it would exceed the intended risk budget.',
+  },
+  {
+    name: 'Live watch',
+    status: 'warning',
+    detail: 'Optional supervisor is not assumed active. This UI remains read-only.',
+  },
+])
 
-async function handleStart() {
-  starting.value = true
-  await store.startBot(botConfig.value)
-  starting.value = false
+const strategies = [
+  {
+    name: 'SWING',
+    mode: 'guarded',
+    badgeClass: 'badge-yellow',
+    description: 'Daily GOLD strategy. Real execution requires explicit Council approval.',
+  },
+  {
+    name: 'SCALP',
+    mode: 'blocked',
+    badgeClass: 'badge-red',
+    description: 'Intraday path requires strategy-specific opt-in before any real execution.',
+  },
+  {
+    name: 'M15',
+    mode: 'paper',
+    badgeClass: 'badge-gray',
+    description: 'Observation-only while re-validation data is collected.',
+  },
+]
+
+function money(value) {
+  if (value === null || value === undefined) return '-'
+  return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value)
 }
 
-async function handleStop() {
-  await store.stopBot()
+function signedMoney(value) {
+  if (value === null || value === undefined) return '-'
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${money(value)}`
 }
 
-onMounted(() => {
-  store.fetchPositions()
-})
+function formatDate(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString()
+}
+
+function formatVerdict(value) {
+  return String(value || '').replaceAll('_', ' ')
+}
+
+onMounted(store.refreshReadOnly)
 </script>
 
 <style scoped>
+.dashboard {
+  display: grid;
+  gap: 1rem;
+}
+
 .page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  gap: 1rem;
   flex-wrap: wrap;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
+}
+
+.verdict {
+  min-width: 240px;
+  border: 1px solid;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.verdict-label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+
+.verdict-danger {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: rgba(248, 81, 73, 0.45);
+}
+
+.verdict-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
-.page-header h1 { font-size: 20px; font-weight: 700; }
 
-.card-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.3rem; }
-.card-value { font-size: 20px; font-weight: 700; }
+.metric-card,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
 
-.section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; }
+.metric-card {
+  padding: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
 
-.config-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.config-row .form-group { flex: 1; min-width: 120px; }
+.metric-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
 
-.position-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 0.5rem; }
-.position-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-weight: 600; }
-.position-row { display: flex; gap: 0.5rem; align-items: center; font-size: 13px; padding: 0.15rem 0; }
+.metric-card strong {
+  font-size: 22px;
+  font-family: var(--mono);
+}
 
-.log-entry { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.log-entry:last-child { border-bottom: none; }
+.panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.8fr);
+  gap: 1rem;
+}
 
-.header-actions { display: flex; gap: 0.5rem; }
+.panel {
+  padding: 1rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.panel-header h2 {
+  font-size: 14px;
+}
+
+.gate-grid,
+.strategy-list,
+.position-list,
+.timeline,
+.kv-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.gate-row,
+.strategy-row,
+.position-row,
+.timeline-row,
+.kv-list div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.gate-row,
+.timeline-row {
+  justify-content: flex-start;
+}
+
+.gate-row p,
+.strategy-row p,
+.timeline-row p {
+  color: var(--muted);
+  margin-top: 0.15rem;
+  font-size: 13px;
+}
+
+.gate-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.gate-running { background: var(--accent); }
+.gate-blocked { background: var(--danger); }
+.gate-warning { background: var(--warning); }
+
+.kv-list dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.kv-list dd {
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.empty-state {
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+@media (max-width: 980px) {
+  .metrics-grid,
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

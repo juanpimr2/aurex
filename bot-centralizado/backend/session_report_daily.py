@@ -7,7 +7,7 @@ Analiza trades reales + senales M15 observadas del dia.
 Genera informe estructurado para revision humana y mejora continua.
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 import csv

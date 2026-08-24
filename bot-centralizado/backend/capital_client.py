@@ -10,6 +10,7 @@ import requests
 import pandas as pd
 from typing import Optional, Dict, List
 from dotenv import load_dotenv
+from runtime_config import broker_mutation_allowed, resolve_capital_mode
 
 load_dotenv()
 
@@ -22,9 +23,10 @@ class CapitalClient:
         self.api_key = os.getenv("CAPITAL_API_KEY", "")
         self.password = os.getenv("CAPITAL_PASSWORD", "")
         self.email = os.getenv("CAPITAL_EMAIL", "")
-        mode = os.getenv("CAPITAL_MODE", "DEMO").upper()
+        mode = resolve_capital_mode()
         self.base_url = self.DEMO_URL if mode == "DEMO" else self.REAL_URL
         self.is_demo = mode == "DEMO"
+        self.mode = mode
 
         self.session = requests.Session()
         self.is_logged_in = False
@@ -167,6 +169,11 @@ class CapitalClient:
         Abrir posición. direction = 'BUY' o 'SELL'.
         Devuelve deal_id si se acepta, None si falla.
         """
+        allowed, reason = broker_mutation_allowed("OPEN_POSITION")
+        if not allowed:
+            print("[CapitalClient] " + reason)
+            return None
+
         if not self.ensure_session():
             return None
         payload = {"epic": epic, "direction": direction, "size": size}
@@ -200,6 +207,11 @@ class CapitalClient:
         evitarlo, cuando solo se pasa un nivel se preserva el otro leyendolo de la
         posicion actual.
         """
+        allowed, reason = broker_mutation_allowed("MODIFY_POSITION")
+        if not allowed:
+            print("[CapitalClient] " + reason)
+            return False
+
         if not self.ensure_session():
             return False
 
@@ -231,6 +243,11 @@ class CapitalClient:
         return False
 
     def close_position(self, deal_id: str) -> bool:
+        allowed, reason = broker_mutation_allowed("CLOSE_POSITION")
+        if not allowed:
+            print("[CapitalClient] " + reason)
+            return False
+
         if not self.ensure_session():
             return False
         try:

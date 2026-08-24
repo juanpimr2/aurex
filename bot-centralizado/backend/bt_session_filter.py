@@ -4,7 +4,7 @@ Test: filtrar trades solo en sesion Londres + NY (08:00-17:00 UTC)
 vs sin filtro de sesion. Hipotesis: mas volumen = mejor win rate.
 """
 import os, sys
-os.environ.setdefault('CAPITAL_MODE', 'REAL')
+os.environ.setdefault('CAPITAL_MODE', 'DEMO')
 sys.path.insert(0, '.')
 
 from capital_client import CapitalClient
