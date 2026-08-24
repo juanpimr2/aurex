@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, render_template_string
 from capital_client import CapitalClient
+from reconciliation_status import build_reconciliation_status
 from runtime_status import build_runtime_status
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -130,6 +131,7 @@ def build_status():
             balance = _client.get_balance()
             for p in _client.get_positions():
                 positions.append({
+                    'deal_id': p.get('deal_id'),
                     'epic': p.get('epic'),
                     'dir': p.get('direction'),
                     'size': p.get('size'),
@@ -160,6 +162,7 @@ def build_status():
         'positions': positions,
         'signals': _last_signals(),
         'truth': _broker_truth(),
+        'reconciliation': build_reconciliation_status(positions=positions),
         'monitors': _monitor_health(),
         'moneda': 'EUR',
     }
@@ -180,6 +183,7 @@ def api_runtime_status():
         broker_ok=status.get('broker_ok'),
         balance=status.get('balance'),
         positions=status.get('positions'),
+        reconciliation=status.get('reconciliation'),
         monitors=status.get('monitors'),
         errors=[] if status.get('broker_ok') else [status.get('estado', 'broker unavailable')],
     ))

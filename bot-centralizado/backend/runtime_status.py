@@ -51,6 +51,7 @@ def build_runtime_status(
     broker_ok: Optional[bool] = None,
     balance: Optional[Dict[str, Any]] = None,
     positions: Optional[Iterable[Dict[str, Any]]] = None,
+    reconciliation: Optional[Dict[str, Any]] = None,
     monitors: Optional[Dict[str, Any]] = None,
     errors: Optional[Iterable[str]] = None,
     updated_at: Optional[str] = None,
@@ -59,6 +60,22 @@ def build_runtime_status(
     positions_list = list(positions or [])
     errors_list = list(errors or [])
     mode = resolve_capital_mode()
+
+    events = [
+        {
+            "level": "info",
+            "message": "runtime status endpoint is read-only",
+        },
+        {
+            "level": "warning",
+            "message": "real trading remains NO-GO",
+        },
+    ]
+    if reconciliation and reconciliation.get("status") != "ok":
+        events.append({
+            "level": "warning",
+            "message": "broker/local reconciliation requires review",
+        })
 
     return {
         "schema_version": RUNTIME_STATUS_SCHEMA_VERSION,
@@ -76,17 +93,9 @@ def build_runtime_status(
             "positions_count": len(positions_list),
             "positions": positions_list,
         },
+        "reconciliation": reconciliation or {},
         "runtime_gates": build_runtime_gates(),
         "monitors": monitors or {},
-        "events": [
-            {
-                "level": "info",
-                "message": "runtime status endpoint is read-only",
-            },
-            {
-                "level": "warning",
-                "message": "real trading remains NO-GO",
-            },
-        ],
+        "events": events,
         "errors": errors_list,
     }

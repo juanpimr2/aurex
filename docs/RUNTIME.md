@@ -100,6 +100,7 @@ The endpoint reports:
 - broker mode and read-only status
 - real-trading verdict
 - account and positions snapshot, when available
+- broker/local reconciliation summary
 - runtime gates
 - monitor health
 - stable errors
@@ -112,3 +113,20 @@ It must not call:
 
 The endpoint may report that broker mutation gates are enabled in the local
 environment, but the dashboard mutation surface itself must remain disabled.
+
+## Broker/Local Reconciliation
+
+The runtime status includes a read-only `reconciliation` section. It compares
+broker positions already fetched by the dashboard with local CSV rows that still
+claim an `OPEN` or `PENDIENTE` trade.
+
+If local logs claim an open/pending trade but the broker has no matching
+position, the status becomes:
+
+```text
+stale_local_state
+```
+
+That condition blocks any real-trading approval until reviewed. It does not
+mean a broker position is currently open; it means local state is not clean
+enough to trust for autonomous execution.

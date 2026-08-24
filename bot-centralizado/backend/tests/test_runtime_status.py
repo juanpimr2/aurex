@@ -56,3 +56,24 @@ def test_runtime_status_has_stable_error_contract(monkeypatch):
     assert status["account"]["balance"] is None
     assert status["account"]["positions"] == []
     assert status["errors"] == ["broker timeout"]
+
+
+def test_runtime_status_includes_reconciliation_warning(monkeypatch):
+    monkeypatch.setenv("CAPITAL_MODE", "DEMO")
+    reconciliation = {
+        "schema_version": "reconciliation.v1",
+        "status": "stale_local_state",
+        "ready_for_real_trading": False,
+        "unmatched_pending_rows": 1,
+    }
+
+    status = build_runtime_status(
+        reconciliation=reconciliation,
+        updated_at="2026-08-24T00:00:00+00:00",
+    )
+
+    assert status["reconciliation"] == reconciliation
+    assert any(
+        event["message"] == "broker/local reconciliation requires review"
+        for event in status["events"]
+    )
