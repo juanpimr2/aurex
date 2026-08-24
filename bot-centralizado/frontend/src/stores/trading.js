@@ -11,18 +11,35 @@ export const useTradingStore = defineStore('trading', () => {
   const lastError = ref(null)
   const notifications = ref([])
   const lastRefresh = ref(null)
+  const runtimeStatus = ref(null)
 
   const totalPnL = computed(() =>
     positions.value.reduce((sum, position) => sum + (position.profit_loss || 0), 0)
   )
 
   const councilVerdict = computed(() => {
+    if (runtimeStatus.value?.verdict) return runtimeStatus.value.verdict
     if (positions.value.length > 0) return 'REVIEW_REQUIRED'
     return 'NO_GO_FOR_REAL_TRADING'
   })
 
+  const runtimeGates = computed(() => {
+    const gates = runtimeStatus.value?.runtime_gates || []
+    return gates.map((gate) => ({
+      name: gate.name.replaceAll('_', ' '),
+      status: gate.allowed ? 'running' : 'blocked',
+      detail: gate.reason,
+    }))
+  })
+
   const runtimeEvents = computed(() => {
+    const contractEvents = runtimeStatus.value?.events?.map((event) => ({
+      label: event.level === 'warning' ? 'Runtime warning' : 'Runtime event',
+      status: event.level === 'warning' ? 'warning' : 'running',
+      detail: event.message,
+    })) || []
     const events = [
+      ...contractEvents,
       {
         label: 'Council live watch',
         status: 'warning',
@@ -77,6 +94,33 @@ export const useTradingStore = defineStore('trading', () => {
     }
   }
 
+  function normalizePosition(position) {
+    return {
+      ...position,
+      direction: position.direction || position.dir,
+      entry_price: position.entry_price ?? position.entry,
+      stop_loss: position.stop_loss ?? position.sl,
+      take_profit: position.take_profit ?? position.tp,
+      profit_loss: position.profit_loss ?? position.pnl ?? 0,
+    }
+  }
+
+  async function fetchRuntimeStatus() {
+    try {
+      const { data } = await axios.get('/api/runtime/status')
+      runtimeStatus.value = data
+      if (data.account?.balance) balance.value = data.account.balance
+      if (Array.isArray(data.account?.positions)) {
+        positions.value = data.account.positions.map(normalizePosition)
+      }
+      if (data.errors?.length) lastError.value = data.errors.join('; ')
+      return true
+    } catch (error) {
+      lastError.value = error.message
+      return false
+    }
+  }
+
   async function fetchBalance() {
     try {
       const { data } = await axios.get('/api/balance')
@@ -105,7 +149,10 @@ export const useTradingStore = defineStore('trading', () => {
   }
 
   async function refreshReadOnly() {
-    await Promise.all([fetchBalance(), fetchPositions(), fetchStatus()])
+    const runtimeOk = await fetchRuntimeStatus()
+    if (!runtimeOk) {
+      await Promise.all([fetchBalance(), fetchPositions(), fetchStatus()])
+    }
     lastRefresh.value = new Date().toISOString()
   }
 
@@ -127,10 +174,13 @@ export const useTradingStore = defineStore('trading', () => {
     lastError,
     notifications,
     lastRefresh,
+    runtimeStatus,
     totalPnL,
     councilVerdict,
+    runtimeGates,
     runtimeEvents,
     connectWS,
+    fetchRuntimeStatus,
     fetchBalance,
     fetchPositions,
     fetchStatus,

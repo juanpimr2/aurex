@@ -132,7 +132,7 @@ import { useTradingStore } from '../stores/trading.js'
 
 const store = useTradingStore()
 
-const gates = computed(() => [
+const fallbackGates = [
   {
     name: 'REAL broker mutation',
     status: 'blocked',
@@ -153,7 +153,9 @@ const gates = computed(() => [
     status: 'warning',
     detail: 'Optional supervisor is not assumed active. This UI remains read-only.',
   },
-])
+]
+
+const gates = computed(() => store.runtimeGates.length ? store.runtimeGates : fallbackGates)
 
 const strategies = [
   {
