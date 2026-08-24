@@ -76,6 +76,16 @@ The Vue dashboard is read-only. It may display:
 It must not provide buttons that open, close, modify, start, or stop live
 trading.
 
+CI enforces this boundary with:
+
+```bash
+python tools/check_readonly_contract.py
+```
+
+The check allows the backtest endpoint, but rejects live-trading mutation
+requests from the Vue dashboard and rejects broker mutation calls outside the
+approved guarded runtime modules.
+
 ## Runtime Status Contract
 
 Canonical read-only runtime endpoint:
