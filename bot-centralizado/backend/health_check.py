@@ -10,7 +10,7 @@ Chequea:
   1. Frescura de monitores (logs B2): ¿corrieron recientemente? ¿errores?
   2. Broker: login, balance, posiciones (¿posicion Aurex sin SL?)
   3. Datos: velas acumuladas hoy, BD accesible, reconciliacion actualizada
-  4. Riesgo: drawdown del equity vs pico historico de trade_closes
+  4. Riesgo: drawdown realizado de trades, separado de depositos/retiros
   5. Integridad: ultimo backup verificable
 
 Salida: informe legible + exit code (0=OK, 1=WARN, 2=CRIT).
@@ -139,8 +139,33 @@ def check_data():
         conn.close()
 
 
+def _realized_trade_drawdown(rows, equity):
+    """Return realized trade drawdown as pct of current equity.
+
+    Deposits, withdrawals and transfers are cash-flow events, not trading
+    losses. They are intentionally excluded from drawdown.
+    """
+    acc, peak = 0.0, 0.0
+    trades = 0
+    for _, pnl, ttype in rows:
+        if ttype != 'TRADE':
+            continue
+        trades += 1
+        acc += float(pnl or 0)
+        peak = max(peak, acc)
+    drawdown_eur = max(0.0, peak - acc)
+    drawdown_pct = (100 * drawdown_eur / equity) if equity and equity > 0 else 0.0
+    return {
+        'trades': trades,
+        'current_pnl': acc,
+        'peak_pnl': peak,
+        'drawdown_eur': drawdown_eur,
+        'drawdown_pct': drawdown_pct,
+    }
+
+
 def check_risk(equity):
-    """Drawdown del equity vs pico (aprox: P&L acumulado + depositos)."""
+    """Drawdown realizado de trades; cash-flow no cuenta como perdida."""
     if equity is None or not os.path.isfile(DB_PATH):
         return
     conn = sqlite3.connect(DB_PATH)
@@ -149,20 +174,22 @@ def check_risk(equity):
             "SELECT date_utc, pnl, tx_type FROM trade_closes ORDER BY date_utc").fetchall()
     finally:
         conn.close()
-    acc, peak = 0.0, 0.0
-    for _, p, ttype in rows:
-        if ttype in ('TRADE', 'DEPOSIT', 'WITHDRAWAL', 'TRANSFER'):
-            acc += p
-        peak = max(peak, acc)
-    # dd relativo del equity actual vs maximo teorico reciente
-    if peak > 0 and equity < peak:
-        dd = 100 * (peak - equity) / peak
-        if dd > 15:
-            crit('Drawdown equity vs pico: %.1f%% (>15%%)' % dd)
-        elif dd > 8:
-            warn('Drawdown equity vs pico: %.1f%%' % dd)
-        else:
-            ok('Drawdown contenido (%.1f%% vs pico)' % dd)
+    risk = _realized_trade_drawdown(rows, equity)
+    if risk['trades'] == 0:
+        ok('Drawdown realizado: sin trades cerrados')
+        return
+
+    dd = risk['drawdown_pct']
+    msg = (
+        'Drawdown realizado de trades: %.1f%% (%.2f EUR; P&L %.2f / pico %.2f)'
+        % (dd, risk['drawdown_eur'], risk['current_pnl'], risk['peak_pnl'])
+    )
+    if dd > 15:
+        crit(msg + ' (>15%)')
+    elif dd > 8:
+        warn(msg)
+    else:
+        ok(msg)
 
 
 def check_backup():
