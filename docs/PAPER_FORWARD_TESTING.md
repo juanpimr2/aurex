@@ -29,6 +29,7 @@ The module provides:
 - JSONL persistence for paper candidates
 - deterministic TP/SL outcome resolution from OHLC candles
 - aggregate summary for runtime/dashboard consumption
+- a read-only live collection runner
 
 Default store:
 
@@ -38,6 +39,31 @@ bot-centralizado/backend/research/paper_forward_events.jsonl
 
 The store is created only when candidates are explicitly written. Reading the
 summary does not create files.
+
+## Commands
+
+Show current paper state:
+
+```powershell
+py -m research.paper_forward_collector --summary
+```
+
+Collect live paper candidates from Capital.com candles:
+
+```powershell
+py -m research.paper_forward_collector --collect-live --epics GOLD,US500,US100,DE40 --timeframes MINUTE_5,MINUTE_15
+```
+
+For REAL account data, set `CAPITAL_MODE=REAL` in the process environment.
+This still does not enable broker mutations.
+
+The runner:
+
+- fetches candles through read-only `CapitalClient` methods
+- creates a candidate only when deterministic filters pass
+- deduplicates repeated polling observations
+- resolves open paper candidates from later candles
+- prints a compact JSON summary for Council sessions
 
 ## Runtime Contract
 
