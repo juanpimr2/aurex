@@ -55,6 +55,7 @@ def build_runtime_status(
     working_orders: Optional[Iterable[Dict[str, Any]]] = None,
     reconciliation: Optional[Dict[str, Any]] = None,
     monitors: Optional[Dict[str, Any]] = None,
+    paper_forward: Optional[Dict[str, Any]] = None,
     errors: Optional[Iterable[str]] = None,
     updated_at: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -103,6 +104,7 @@ def build_runtime_status(
             working_orders=working_orders_list,
         ),
         "reconciliation": reconciliation or {},
+        "paper_forward": paper_forward or {},
         "runtime_gates": build_runtime_gates(),
         "monitors": monitors or {},
         "events": events,
