@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, jsonify, render_template_string
 from capital_client import CapitalClient
 from reconciliation_status import build_reconciliation_status
+from research.paper_forward_collector import summarize_paper_state
 from runtime_status import build_runtime_status
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -118,6 +119,18 @@ def _broker_truth():
     return out
 
 
+def _paper_forward_status():
+    try:
+        return summarize_paper_state()
+    except Exception as exc:
+        return {
+            'schema_version': 'paper-forward.v1',
+            'status': 'ERROR',
+            'error': str(exc),
+            'broker_mutations': 'disabled',
+        }
+
+
 def build_status():
     now = time.time()
     if _cache['data'] and now - _cache['ts'] < CACHE_SEC:
@@ -175,6 +188,7 @@ def build_status():
         'signals': _last_signals(),
         'truth': _broker_truth(),
         'reconciliation': build_reconciliation_status(positions=positions),
+        'paper_forward': _paper_forward_status(),
         'monitors': _monitor_health(),
         'moneda': 'EUR',
     }
@@ -197,6 +211,7 @@ def api_runtime_status():
         positions=status.get('positions'),
         working_orders=status.get('working_orders'),
         reconciliation=status.get('reconciliation'),
+        paper_forward=status.get('paper_forward'),
         monitors=status.get('monitors'),
         errors=[] if status.get('broker_ok') else [status.get('estado', 'broker unavailable')],
     ))

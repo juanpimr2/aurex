@@ -103,3 +103,20 @@ def test_runtime_status_includes_reconciliation_warning(monkeypatch):
         event["message"] == "broker/local reconciliation requires review"
         for event in status["events"]
     )
+
+
+def test_runtime_status_includes_paper_forward_state(monkeypatch):
+    monkeypatch.setenv("CAPITAL_MODE", "DEMO")
+    paper_forward = {
+        "schema_version": "paper-forward.v1",
+        "status": "NO_DATA",
+        "total_candidates": 0,
+        "broker_mutations": "disabled",
+    }
+
+    status = build_runtime_status(
+        paper_forward=paper_forward,
+        updated_at="2026-08-24T00:00:00+00:00",
+    )
+
+    assert status["paper_forward"] == paper_forward

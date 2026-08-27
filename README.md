@@ -604,6 +604,7 @@ Start here for the current operating model and SDD backlog:
 
 - [Council Operating Plan](docs/COUNCIL_OPERATING_PLAN.md)
 - [Scalping Lab Evidence](docs/SCALPING_LAB.md)
+- [Paper Forward Testing](docs/PAPER_FORWARD_TESTING.md)
 - [Runtime Policy](docs/RUNTIME.md)
 
 ---

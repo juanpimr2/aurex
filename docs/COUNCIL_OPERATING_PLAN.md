@@ -83,6 +83,8 @@ Current conclusion:
 
 ### SPEC-009: Paper Forward-Test Collector
 
+Status: in progress
+
 Goal:
 
 - Record live read-only signals and hypothetical fills without broker mutation.
