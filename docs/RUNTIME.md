@@ -100,6 +100,8 @@ The endpoint reports:
 - broker mode and read-only status
 - real-trading verdict
 - account and positions snapshot, when available
+- working orders snapshot, when available
+- supervised live policy readiness
 - broker/local reconciliation summary
 - runtime gates
 - monitor health
@@ -130,3 +132,35 @@ stale_local_state
 That condition blocks any real-trading approval until reviewed. It does not
 mean a broker position is currently open; it means local state is not clean
 enough to trust for autonomous execution.
+
+## Supervised Live Policy
+
+The runtime status includes a read-only `live_policy` section. It explains the
+current supervised-live objective, approval model, risk controls, and readiness
+checks.
+
+The default policy verdict is still:
+
+```text
+NO_GO_FOR_REAL_TRADING
+```
+
+The EUR 500 to EUR 550 weekly target is treated as a business objective, not as
+a promised trading outcome.
+
+See:
+
+```text
+docs/LIVE_TRADING_POLICY.md
+```
+
+## Scalping Lab
+
+The scalping research path is documented in:
+
+```text
+docs/SCALPING_LAB.md
+```
+
+It is read-only and may fetch market data from Capital.com. It must not enable
+broker mutations.

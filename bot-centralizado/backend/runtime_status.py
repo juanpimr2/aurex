@@ -8,6 +8,7 @@ opens, modifies, or closes broker positions.
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional
 
+from live_policy import build_live_policy
 from runtime_config import broker_mutation_allowed, real_trading_allowed, resolve_capital_mode
 
 
@@ -51,6 +52,7 @@ def build_runtime_status(
     broker_ok: Optional[bool] = None,
     balance: Optional[Dict[str, Any]] = None,
     positions: Optional[Iterable[Dict[str, Any]]] = None,
+    working_orders: Optional[Iterable[Dict[str, Any]]] = None,
     reconciliation: Optional[Dict[str, Any]] = None,
     monitors: Optional[Dict[str, Any]] = None,
     errors: Optional[Iterable[str]] = None,
@@ -58,6 +60,7 @@ def build_runtime_status(
 ) -> Dict[str, Any]:
     """Build the canonical read-only runtime status response."""
     positions_list = list(positions or [])
+    working_orders_list = list(working_orders or [])
     errors_list = list(errors or [])
     mode = resolve_capital_mode()
 
@@ -92,7 +95,13 @@ def build_runtime_status(
             "balance": balance,
             "positions_count": len(positions_list),
             "positions": positions_list,
+            "working_orders_count": len(working_orders_list),
+            "working_orders": working_orders_list,
         },
+        "live_policy": build_live_policy(
+            positions=positions_list,
+            working_orders=working_orders_list,
+        ),
         "reconciliation": reconciliation or {},
         "runtime_gates": build_runtime_gates(),
         "monitors": monitors or {},

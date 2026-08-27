@@ -13,6 +13,7 @@ def test_runtime_status_contract_defaults_to_read_only(monkeypatch):
         broker_ok=True,
         balance={"balance": 500, "available": 500, "profit_loss": 0},
         positions=[],
+        working_orders=[],
         monitors={},
         updated_at="2026-08-24T00:00:00+00:00",
     )
@@ -22,6 +23,8 @@ def test_runtime_status_contract_defaults_to_read_only(monkeypatch):
     assert status["verdict"] == "NO_GO_FOR_REAL_TRADING"
     assert status["broker"]["read_only"] is True
     assert status["account"]["positions_count"] == 0
+    assert status["account"]["working_orders_count"] == 0
+    assert status["live_policy"]["verdict"] == "NO_GO_FOR_REAL_TRADING"
     assert any(g["name"] == "dashboard_mutation_surface" and g["allowed"] is False for g in status["runtime_gates"])
 
 
@@ -55,7 +58,30 @@ def test_runtime_status_has_stable_error_contract(monkeypatch):
     assert status["broker"]["ok"] is False
     assert status["account"]["balance"] is None
     assert status["account"]["positions"] == []
+    assert status["account"]["working_orders"] == []
     assert status["errors"] == ["broker timeout"]
+
+
+def test_runtime_status_includes_working_orders(monkeypatch):
+    monkeypatch.setenv("CAPITAL_MODE", "DEMO")
+    working_orders = [
+        {
+            "deal_id": "order-1",
+            "epic": "GOLD",
+            "direction": "BUY",
+            "size": 0.1,
+            "level": 4600,
+            "status": "OPEN",
+        },
+    ]
+
+    status = build_runtime_status(
+        working_orders=working_orders,
+        updated_at="2026-08-24T00:00:00+00:00",
+    )
+
+    assert status["account"]["working_orders_count"] == 1
+    assert status["account"]["working_orders"] == working_orders
 
 
 def test_runtime_status_includes_reconciliation_warning(monkeypatch):

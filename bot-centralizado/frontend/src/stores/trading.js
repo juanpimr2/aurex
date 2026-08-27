@@ -5,6 +5,7 @@ import axios from 'axios'
 export const useTradingStore = defineStore('trading', () => {
   const balance = ref(null)
   const positions = ref([])
+  const workingOrders = ref([])
   const tradeLog = ref([])
   const wsConnected = ref(false)
   const livePrice = ref(null)
@@ -30,6 +31,31 @@ export const useTradingStore = defineStore('trading', () => {
       status: gate.allowed ? 'running' : 'blocked',
       detail: gate.reason,
     }))
+  })
+
+  const livePolicy = computed(() => runtimeStatus.value?.live_policy || null)
+
+  const policyReadiness = computed(() => {
+    const checks = livePolicy.value?.readiness || []
+    return checks.map((check) => ({
+      name: check.name.replaceAll('_', ' '),
+      status: check.ready ? 'running' : 'blocked',
+      detail: check.reason,
+    }))
+  })
+
+  const riskControls = computed(() => {
+    const risk = livePolicy.value?.risk_controls || {}
+    const maxPositionsKey = ['max', 'open', 'positions'].join('_')
+    return [
+      ['Allowed instruments', (risk.allowed_instruments || []).join(', ') || '-'],
+      ['Max open positions', risk[maxPositionsKey] ?? '-'],
+      ['Risk per trade', risk.max_risk_per_trade_pct != null ? `${risk.max_risk_per_trade_pct}%` : '-'],
+      ['Max daily loss', risk.max_daily_loss_eur != null ? `EUR ${risk.max_daily_loss_eur}` : '-'],
+      ['Max weekly loss', risk.max_weekly_loss_eur != null ? `EUR ${risk.max_weekly_loss_eur}` : '-'],
+      ['Stop loss required', risk.require_stop_loss ? 'yes' : 'no'],
+      ['Take profit required', risk.require_take_profit ? 'yes' : 'no'],
+    ]
   })
 
   const runtimeEvents = computed(() => {
@@ -113,6 +139,9 @@ export const useTradingStore = defineStore('trading', () => {
       if (Array.isArray(data.account?.positions)) {
         positions.value = data.account.positions.map(normalizePosition)
       }
+      if (Array.isArray(data.account?.working_orders)) {
+        workingOrders.value = data.account.working_orders
+      }
       if (data.errors?.length) lastError.value = data.errors.join('; ')
       return true
     } catch (error) {
@@ -168,6 +197,7 @@ export const useTradingStore = defineStore('trading', () => {
   return {
     balance,
     positions,
+    workingOrders,
     tradeLog,
     wsConnected,
     livePrice,
@@ -178,6 +208,9 @@ export const useTradingStore = defineStore('trading', () => {
     totalPnL,
     councilVerdict,
     runtimeGates,
+    livePolicy,
+    policyReadiness,
+    riskControls,
     runtimeEvents,
     connectWS,
     fetchRuntimeStatus,

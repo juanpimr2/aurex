@@ -123,7 +123,7 @@ def build_status():
     if _cache['data'] and now - _cache['ts'] < CACHE_SEC:
         return _cache['data']
 
-    balance, positions, precio = None, [], None
+    balance, positions, working_orders, precio = None, [], [], None
     broker_ok = False
     try:
         if _client.ensure_session():
@@ -140,6 +140,17 @@ def build_status():
                     'tp': p.get('take_profit'),
                     'pnl': p.get('profit_loss'),
                     'aurex': p.get('epic') == 'GOLD',
+                })
+            for order in _client.get_working_orders():
+                working_orders.append({
+                    'deal_id': order.get('deal_id'),
+                    'epic': order.get('epic'),
+                    'dir': order.get('direction'),
+                    'size': order.get('size'),
+                    'level': order.get('level'),
+                    'type': order.get('type'),
+                    'status': order.get('status'),
+                    'created_at': order.get('created_at'),
                 })
             df = _client.get_prices('GOLD', 'MINUTE_15', 3)
             if df is not None and len(df):
@@ -160,6 +171,7 @@ def build_status():
         'precio_gold': precio,
         'balance': balance,
         'positions': positions,
+        'working_orders': working_orders,
         'signals': _last_signals(),
         'truth': _broker_truth(),
         'reconciliation': build_reconciliation_status(positions=positions),
@@ -183,6 +195,7 @@ def api_runtime_status():
         broker_ok=status.get('broker_ok'),
         balance=status.get('balance'),
         positions=status.get('positions'),
+        working_orders=status.get('working_orders'),
         reconciliation=status.get('reconciliation'),
         monitors=status.get('monitors'),
         errors=[] if status.get('broker_ok') else [status.get('estado', 'broker unavailable')],
