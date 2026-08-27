@@ -26,11 +26,48 @@ Run from `bot-centralizado/backend`:
 $env:CAPITAL_MODE='REAL'
 Remove-Item Env:\AUREX_ALLOW_REAL -ErrorAction SilentlyContinue
 Remove-Item Env:\AUREX_ALLOW_BROKER_MUTATION -ErrorAction SilentlyContinue
-python research\scalping_lab.py --epics GOLD,US500,US100,DE40,OIL_CRUDE,OIL_BRENT,SP35 --timeframes MINUTE_5,MINUTE_15 --initial-capital 500 --risk-eur 3 --target-eur 3 --max-candles 1000 --max-trades-per-day 20
+python research\scalping_lab.py --epics GOLD,US500,US100,DE40,OIL_CRUDE,OIL_BRENT,SP35 --timeframes MINUTE_5,MINUTE_15 --initial-capital 500 --risk-eur 3 --target-eur 3 --max-candles 1000 --max-trades-per-day 20 --spread-multipliers 1.0,1.5,2.0,3.0 --split-ratio 0.7 --min-trades-promote 100
+```
+
+For rolling walk-forward:
+
+```powershell
+python research\scalping_lab.py --walk-forward --wf-train-size 500 --wf-test-size 200 --wf-step-size 200 --epics GOLD,US500,US100,DE40,OIL_CRUDE,OIL_BRENT,SP35 --timeframes MINUTE_5,MINUTE_15 --initial-capital 500 --risk-eur 3 --target-eur 3 --max-candles 1000 --spread-multipliers 1.0,1.5,2.0,3.0 --min-trades-promote 100
 ```
 
 The script fetches Capital.com data and never opens, modifies, or closes broker
 positions.
+
+## Walk-Forward And Cost Stress
+
+The lab separates results into:
+
+- `in_sample`
+- `out_of_sample`
+
+The console ranking shows out-of-sample rows first because those are more useful
+for Council decisions.
+
+The lab also runs spread stress scenarios:
+
+- x1.0
+- x1.5
+- x2.0
+- x3.0
+
+Each result is classified:
+
+- `NO_DATA`: no trades under the filters.
+- `EXPLORATORY_LOW_SAMPLE`: result has fewer than the promotion threshold.
+- `CANDIDATE`: enough trades, positive expectancy, PF >= 1.3, and drawdown within policy.
+- `REJECTED`: enough data but insufficient risk/return.
+
+No configuration should be promoted from fewer than 100 trades unless explicitly
+marked as exploratory.
+
+The summary ranks out-of-sample aggregates by configuration and reports how
+many windows were positive. This reduces the risk of selecting a lucky single
+split from many tested combinations.
 
 ## First Preliminary Run
 
@@ -68,6 +105,76 @@ Interpretation:
 
 1. Expand historical sample beyond 1000 candles where possible.
 2. Add walk-forward split and dataset hashes.
-3. Add spread stress tests: x1.0, x1.5, x2.0.
+3. Add spread stress tests: x1.0, x1.5, x2.0, x3.0.
 4. Add ATR-target variants instead of only fixed EUR target.
 5. Add paper-trading simulator output before any supervised live mode.
+
+## Walk-Forward Preliminary Run
+
+Generated UTC: `2026-08-27 13:33:23`
+
+Configuration:
+
+- initial capital: EUR 500
+- risk per trade: EUR 3
+- target per trade: EUR 3
+- spread stress: x1.0, x1.5, x2.0, x3.0
+- slippage: 0.25 x observed spread
+- split ratio: 70% in-sample, 30% out-of-sample
+- promotion threshold: 100 trades
+
+Top out-of-sample rows:
+
+| Instrument | Timeframe | Session | Spread x | Trades | P&L | PF | WR | Expectancy | Class |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| DE40 | MINUTE_15 | NY overlap | 1.0 | 3 | 1.60 | 1.46 | 66.7% | 0.532 | EXPLORATORY_LOW_SAMPLE |
+| OIL_BRENT | MINUTE_5 | all | 3.0 | 8 | 3.33 | 1.41 | 75.0% | 0.417 | EXPLORATORY_LOW_SAMPLE |
+| SP35 | MINUTE_15 | London | 3.0 | 4 | 1.67 | 1.41 | 75.0% | 0.417 | EXPLORATORY_LOW_SAMPLE |
+| SP35 | MINUTE_5 | NY overlap | 1.5 | 4 | 1.33 | 1.32 | 75.0% | 0.333 | EXPLORATORY_LOW_SAMPLE |
+
+Interpretation:
+
+- No result is currently promotable.
+- Positive rows are too small to trust.
+- The next useful improvement is a larger historical dataset or a paper
+  forward-test stream that accumulates enough trades without broker mutations.
+
+## Rolling Walk-Forward Run
+
+Generated UTC: `2026-08-27 13:42:39`
+
+Configuration:
+
+- 168 configurations tested
+- rolling windows: 500 train / 200 test / 200 step
+- initial capital: EUR 500
+- risk per trade: EUR 3
+- target per trade: EUR 3
+- spread stress: x1.0, x1.5, x2.0, x3.0
+- slippage: 0.25 x observed spread
+- promotion threshold: 100 trades
+
+Outcome:
+
+- zero `CANDIDATE` configurations
+- all ranked rows are `EXPLORATORY_LOW_SAMPLE`
+- best ranked aggregates still had too few trades and unstable windows
+
+Top rows:
+
+| Instrument | Timeframe | Session | Spread x | Trades | Windows Positive/With Trades | P&L | Avg PF | Expectancy | Class |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| OIL_BRENT | MINUTE_15 | all | 1.0 | 12 | 1/2 | -10.32 | 1.00 | -0.860 | EXPLORATORY_LOW_SAMPLE |
+| DE40 | MINUTE_15 | London | 1.5 | 9 | 1/2 | -10.66 | 1.00 | -1.184 | EXPLORATORY_LOW_SAMPLE |
+| DE40 | MINUTE_15 | all | 2.0 | 15 | 1/2 | -6.28 | 0.96 | -0.419 | EXPLORATORY_LOW_SAMPLE |
+| SP35 | MINUTE_15 | NY overlap | 3.0 | 5 | 1/2 | 3.58 | 0.94 | 0.716 | EXPLORATORY_LOW_SAMPLE |
+| GOLD | MINUTE_15 | NY overlap | 1.0 | 2 | 0/1 | -0.72 | 0.79 | -0.360 | EXPLORATORY_LOW_SAMPLE |
+
+Council interpretation:
+
+- The current breakout scalping hypothesis does not justify paper or live
+  trading.
+- GOLD remains unproven for EUR 3 scalping.
+- The next useful work is either better historical data depth or a different
+  hypothesis family, such as ATR-target momentum pullback, VWAP/session range,
+  or opening-range breakout.
