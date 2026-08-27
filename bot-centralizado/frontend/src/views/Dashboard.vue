@@ -28,6 +28,10 @@
         <span>Positions</span>
         <strong>{{ store.positions.length }}</strong>
       </article>
+      <article class="metric-card">
+        <span>Working Orders</span>
+        <strong>{{ store.workingOrders.length }}</strong>
+      </article>
     </section>
 
     <section class="panel-grid">
@@ -72,6 +76,48 @@
     </section>
 
     <section class="panel-grid">
+      <article class="panel panel-wide">
+        <div class="panel-header">
+          <h2>Supervised Live Policy</h2>
+          <span class="badge badge-red">{{ formatVerdict(store.livePolicy?.verdict || 'NO_GO_FOR_REAL_TRADING') }}</span>
+        </div>
+        <div class="policy-summary">
+          <div>
+            <span>Weekly objective</span>
+            <strong>{{ weeklyObjective }}</strong>
+            <p>{{ store.livePolicy?.objective?.note || 'Target is not a guarantee.' }}</p>
+          </div>
+          <div>
+            <span>Approval model</span>
+            <strong>{{ store.livePolicy?.approval_model?.approval_scope || 'per supervised live session' }}</strong>
+            <p>Broker mutation remains disabled from the dashboard.</p>
+          </div>
+        </div>
+        <div class="gate-grid policy-readiness">
+          <div v-for="check in policyReadiness" :key="check.name" class="gate-row">
+            <span class="gate-dot" :class="`gate-${check.status}`"></span>
+            <div>
+              <strong>{{ check.name }}</strong>
+              <p>{{ check.detail }}</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Risk Controls</h2>
+        </div>
+        <dl class="kv-list">
+          <div v-for="[label, value] in store.riskControls" :key="label">
+            <dt>{{ label }}</dt>
+            <dd>{{ value }}</dd>
+          </div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="panel-grid">
       <article class="panel">
         <div class="panel-header">
           <h2>Strategy Councils</h2>
@@ -104,6 +150,25 @@
             <span :class="(p.profit_loss || 0) >= 0 ? 'text-green' : 'text-red'">
               {{ signedMoney(p.profit_loss || 0) }}
             </span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <h2>Working Orders</h2>
+          <span class="badge badge-gray">{{ store.workingOrders.length }}</span>
+        </div>
+        <div v-if="!store.workingOrders.length" class="empty-state">
+          No pending broker orders detected.
+        </div>
+        <div v-else class="position-list">
+          <div v-for="order in store.workingOrders" :key="order.deal_id || `${order.epic}-${order.level}`" class="position-row">
+            <div>
+              <strong>{{ order.epic || '-' }}</strong>
+              <p>{{ order.dir || order.direction || '-' }} x{{ order.size || '-' }} at {{ order.level || '-' }}</p>
+            </div>
+            <span class="badge badge-yellow">{{ order.status || order.type || 'pending' }}</span>
           </div>
         </div>
       </article>
@@ -156,6 +221,19 @@ const fallbackGates = [
 ]
 
 const gates = computed(() => store.runtimeGates.length ? store.runtimeGates : fallbackGates)
+const policyReadiness = computed(() => store.policyReadiness.length ? store.policyReadiness : [
+  {
+    name: 'policy contract',
+    status: 'blocked',
+    detail: 'Runtime policy contract is unavailable.',
+  },
+])
+
+const weeklyObjective = computed(() => {
+  const objective = store.livePolicy?.objective
+  if (!objective) return 'EUR 50 from EUR 500'
+  return `EUR ${objective.weekly_profit_target_eur} from EUR ${objective.starting_capital_eur}`
+})
 
 const strategies = [
   {
@@ -248,7 +326,7 @@ onMounted(store.refreshReadOnly)
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -298,12 +376,41 @@ onMounted(store.refreshReadOnly)
 }
 
 .gate-grid,
+.policy-summary,
 .strategy-list,
 .position-list,
 .timeline,
 .kv-list {
   display: grid;
   gap: 0.75rem;
+}
+
+.policy-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0.9rem;
+}
+
+.policy-summary div {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.policy-summary span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 0.2rem;
+}
+
+.policy-summary p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 0.2rem;
+}
+
+.policy-readiness {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
 }
 
 .gate-row,
@@ -362,7 +469,8 @@ onMounted(store.refreshReadOnly)
 
 @media (max-width: 980px) {
   .metrics-grid,
-  .panel-grid {
+  .panel-grid,
+  .policy-summary {
     grid-template-columns: 1fr;
   }
 }

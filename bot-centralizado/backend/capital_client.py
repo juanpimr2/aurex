@@ -157,6 +157,34 @@ class CapitalClient:
             print(f"[CapitalClient] get_positions error: {e}")
         return []
 
+    def get_working_orders(self) -> List[Dict]:
+        """Return pending broker orders. SOLO LECTURA."""
+        if not self.ensure_session():
+            return []
+        try:
+            r = self.session.get(f"{self.base_url}/workingorders", timeout=10)
+            if r.status_code == 200:
+                raw = r.json()
+                orders = raw.get("workingOrders", raw.get("workingorders", raw.get("orders", [])))
+                out = []
+                for item in orders:
+                    order = item.get("workingOrderData", item)
+                    market = item.get("marketData", item.get("market", {}))
+                    out.append({
+                        "deal_id": order.get("dealId"),
+                        "epic": order.get("epic") or market.get("epic"),
+                        "direction": order.get("direction"),
+                        "size": order.get("size"),
+                        "level": order.get("orderLevel") or order.get("level"),
+                        "type": order.get("type"),
+                        "status": order.get("status"),
+                        "created_at": order.get("createdDateUTC"),
+                    })
+                return out
+        except Exception as e:
+            print(f"[CapitalClient] get_working_orders error: {e}")
+        return []
+
     def open_position(
         self,
         epic: str,
