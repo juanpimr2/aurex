@@ -590,6 +590,24 @@ aurex/
 
 ---
 
+## AI Council Operations
+
+Aurex is currently supervised through the global AI Council at
+`C:\Users\sagas\.ai-council`. Project-specific Council context lives in
+`.ai/`.
+
+Current Council mode is read-only supervision: runtime and Capital.com state may
+be inspected, but broker mutations must remain blocked unless a bounded
+supervised-live session is explicitly approved and all safety gates are green.
+
+Start here for the current operating model and SDD backlog:
+
+- [Council Operating Plan](docs/COUNCIL_OPERATING_PLAN.md)
+- [Scalping Lab Evidence](docs/SCALPING_LAB.md)
+- [Runtime Policy](docs/RUNTIME.md)
+
+---
+
 ## For AI Agents
 
 ```yaml
