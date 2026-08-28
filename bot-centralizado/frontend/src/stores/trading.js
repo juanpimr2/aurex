@@ -34,6 +34,11 @@ export const useTradingStore = defineStore('trading', () => {
   })
 
   const livePolicy = computed(() => runtimeStatus.value?.live_policy || null)
+  const paperForward = computed(() => runtimeStatus.value?.paper_forward || null)
+
+  const unprotectedPositions = computed(() => positions.value.filter((position) =>
+    position.stop_loss == null || position.take_profit == null
+  ))
 
   const policyReadiness = computed(() => {
     const checks = livePolicy.value?.readiness || []
@@ -209,6 +214,8 @@ export const useTradingStore = defineStore('trading', () => {
     councilVerdict,
     runtimeGates,
     livePolicy,
+    paperForward,
+    unprotectedPositions,
     policyReadiness,
     riskControls,
     runtimeEvents,

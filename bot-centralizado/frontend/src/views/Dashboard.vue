@@ -78,6 +78,47 @@
     <section class="panel-grid">
       <article class="panel panel-wide">
         <div class="panel-header">
+          <h2>Paper Forward Testing</h2>
+          <span class="badge" :class="paperStatusClass">{{ paperStatus }}</span>
+        </div>
+        <div class="paper-summary">
+          <div>
+            <span>Candidates</span>
+            <strong>{{ store.paperForward?.total_candidates ?? 0 }}</strong>
+          </div>
+          <div>
+            <span>Open</span>
+            <strong>{{ store.paperForward?.open_candidates ?? 0 }}</strong>
+          </div>
+          <div>
+            <span>Closed</span>
+            <strong>{{ store.paperForward?.closed_candidates ?? 0 }}</strong>
+          </div>
+          <div>
+            <span>Win rate</span>
+            <strong>{{ store.paperForward?.win_rate_pct != null ? `${store.paperForward.win_rate_pct}%` : '-' }}</strong>
+          </div>
+        </div>
+        <p class="panel-note">Read-only evidence collection. Paper results do not represent broker positions.</p>
+      </article>
+
+      <article class="panel" :class="store.unprotectedPositions.length ? 'panel-alert' : ''">
+        <div class="panel-header">
+          <h2>Protection Check</h2>
+          <span class="badge" :class="store.unprotectedPositions.length ? 'badge-red' : 'badge-green'">
+            {{ store.unprotectedPositions.length ? 'action required' : 'protected' }}
+          </span>
+        </div>
+        <p v-if="store.unprotectedPositions.length" class="panel-note">
+          {{ store.unprotectedPositions.length }} broker position(s) have no complete SL/TP protection. Review manually in Capital.com.
+        </p>
+        <p v-else class="panel-note">No unprotected broker positions detected.</p>
+      </article>
+    </section>
+
+    <section class="panel-grid">
+      <article class="panel panel-wide">
+        <div class="panel-header">
           <h2>Supervised Live Policy</h2>
           <span class="badge badge-red">{{ formatVerdict(store.livePolicy?.verdict || 'NO_GO_FOR_REAL_TRADING') }}</span>
         </div>
@@ -234,6 +275,9 @@ const weeklyObjective = computed(() => {
   if (!objective) return 'EUR 50 from EUR 500'
   return `EUR ${objective.weekly_profit_target_eur} from EUR ${objective.starting_capital_eur}`
 })
+
+const paperStatus = computed(() => store.paperForward?.status || 'NO_DATA')
+const paperStatusClass = computed(() => paperStatus.value === 'ACTIVE' ? 'badge-green' : 'badge-gray')
 
 const strategies = [
   {
@@ -413,6 +457,38 @@ onMounted(store.refreshReadOnly)
   padding-top: 0.75rem;
 }
 
+.paper-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.paper-summary div {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.paper-summary span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 0.2rem;
+}
+
+.paper-summary strong {
+  font-family: var(--mono);
+}
+
+.panel-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 0.8rem;
+}
+
+.panel-alert {
+  border-color: rgba(248, 81, 73, 0.6);
+}
+
 .gate-row,
 .strategy-row,
 .position-row,
@@ -470,7 +546,8 @@ onMounted(store.refreshReadOnly)
 @media (max-width: 980px) {
   .metrics-grid,
   .panel-grid,
-  .policy-summary {
+  .policy-summary,
+  .paper-summary {
     grid-template-columns: 1fr;
   }
 }
